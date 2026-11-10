@@ -1,13 +1,12 @@
-# Validation report — depth-aware tie-breaks in Sabre
+# Validation report: depth-aware tie-breaks in Sabre
 
-**Change:** iteration-1 depth-aware tie-breaks (`crates/transpiler/src/passes/sabre/{dag,layout,route}.rs`).
-**Method:** official transpiler evaluator (`eval_official.sh`), the same harness used to score every EAT iteration,
-run on the clean baseline with **only this change's 3 files applied** — so the measured effect is this change alone,
-not bundled with later iterations.
-**Baseline:** Qiskit `73aa14d` + the shared VF2 tie-break fix (commit `9292f627e`).
-**Panel:** official `iterations-profile` — QFT, square-Heisenberg and QAOA at 100 qubits, on cz / cx / ecr bases,
-optimization level 2, **100 transpilation seeds per case**.
-**Run:** CCC, 2026-11-10.
+**Change:** depth-aware tie-breaks in `crates/transpiler/src/passes/sabre/{dag,layout,route}.rs`.
+**Method:** the transpiler benchmark harness, run on the baseline tree with only this change's 3 files applied, so the
+numbers reflect this change on its own.
+**Baseline:** Qiskit `73aa14d` plus the shared VF2 tie-break fix (commit `9292f627e`).
+**Panel:** QFT, square-Heisenberg and QAOA at 100 qubits, on the cz, cx and ecr bases, optimization level 2, 100
+transpilation seeds per case.
+**Run:** 2026-11-10.
 
 ## Verdict
 
@@ -36,8 +35,8 @@ optimization level 2, **100 transpilation seeds per case**.
 | QAOA ba n100 | ecr | 0.912 | 1.034 | pass |
 | **Panel (weighted)** | | **0.913** | **0.994** | — |
 
-D2 improves on all nine case×base points. N2 improves on six; on QAOA it rises +3.4–3.5%, within the harness's
-1.05× per-case cap, so it is not a gate that fails. The net N2 is −0.6% (flat).
+Depth is lower on all nine workload/basis combinations. Gate count is lower on six; on QAOA it rises 3.4 to 3.5%,
+below the 5% per-case limit. Across the panel gate count is 0.6% lower.
 
 ## Correctness (all pass on the evolved tree)
 
@@ -50,13 +49,12 @@ D2 improves on all nine case×base points. N2 improves on six; on QAOA it rises 
 Constraint families evaluated and passed: IA1 (legality) ×7, IA2 (improvement), IA3 (primary D2/N2 + cx/ecr basis
 panels) ×6, IA4 (per-case D2/N2 caps) ×21, IA5 ×3, IA6, audit, baseline, harness.
 
-## Honest scope
+## Scope
 
-- This is the compact `iterations-profile` (3 workloads), chosen to isolate this single change quickly. It is **not**
-  the full 8-family (G1–G8) dev panel; a full-panel re-run would add the per-family breakdown but is not required to
-  establish this change's isolated effect.
-- Development-panel result on one task (two-qubit depth) and one metric family. It is the first of five stacked EAT
-  changes; each will be benchmarked the same way on its own branch.
+- Three-workload panel, not Qiskit's full benchmark suite. It measures this change in isolation; a wider run would
+  add a per-family breakdown.
+- Two-qubit depth on one optimization level. One of a set of separate Sabre changes, each benchmarked on its own
+  branch.
 
 ## Reproduce
 

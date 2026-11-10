@@ -1,47 +1,63 @@
-# PR: Sabre — break ties by two-qubit depth in layout-trial and swap selection
+# Sabre: break ties by two-qubit depth in layout-trial and swap selection
 
-## Summary
-Sabre's layout and routing stages repeatedly choose among options its scoring rates as **equal** — layout trials
-with identical swap counts, and candidate swaps with identical heuristic scores — and currently resolves those ties
-arbitrarily (lowest trial index; uniform-random swap). This PR resolves them by **estimated two-qubit depth**
-instead: among equally-rated options, keep the one that routes the circuit's two-qubit gates in the fewest layers.
+## What this changes
 
-The change is confined to the tie-break. It does **not** alter which layout trials are generated, which swaps are
-considered, or any heuristic score. Because it only reorders options already judged equal on swap cost, it **cannot
-increase swap count or two-qubit gate count** — the effect is to route the same gates with more parallelism, i.e.
-shallower. Default behaviour; no new public API or flag.
+Sabre has two places where it picks between options that its own scoring treats as equal:
 
-## Mechanism
-1. **Layout-trial selection** (`layout.rs`). Selection key becomes `(swap_count, estimated_2q_depth, trial_index)`
-   instead of `(swap_count, trial_index)`. The depth estimate replays the routed order once, counting a SWAP as three
-   two-qubit gates; `route.rs` exposes it via `selection_key()` and `dag.rs` records each node's two-qubit-gate count
-   (`num_2q`) so the replay is exact.
-2. **Swap selection during routing** (`route.rs`). For look-ahead heuristics, Sabre tracks each physical qubit's
-   running two-qubit depth (circuit 2q gates add depth; a SWAP synchronises its two qubits but adds none). Among the
-   swaps tied for the best heuristic score, it keeps those whose deeper qubit is shallowest, then falls back to the
-   existing random choice; the tracking is rolled back with the router's existing release-valve.
+1. When it selects the best layout trial, several trials can finish with the same swap count. It currently keeps the
+   one with the lowest trial index.
+2. When it picks the next swap during routing, several candidate swaps can share the best heuristic score. It
+   currently picks one of them at random.
 
-## Files changed
+In both cases the choice is arbitrary. This PR makes it pick, among the tied options, the one that gives the lower
+two-qubit depth.
+
+Swap count stays the primary key for layout-trial selection, and the swap tie-break only reorders swaps that already
+share the best score. So the number of swaps Sabre inserts does not change, which means two-qubit gate count does not
+change. Only the depth of the result changes.
+
+The change is on by default. There is no new argument or configuration.
+
+## How it works
+
+**Layout-trial selection** (`layout.rs`). The selection key changes from `(swap_count, trial_index)` to
+`(swap_count, estimated_two_qubit_depth, trial_index)`. The depth estimate replays the trial's routed gate order once
+and counts a SWAP as three two-qubit gates. `route.rs` computes it (`selection_key`), and `dag.rs` stores the
+two-qubit-gate count of each node (`num_2q`) so the replay does not have to recount.
+
+**Swap tie-break** (`route.rs`). During routing, Sabre tracks the two-qubit depth reached on each physical qubit (a
+circuit two-qubit gate adds a layer; a SWAP only synchronises its two qubits). Among the swaps tied for the best
+heuristic score, it keeps the ones whose deeper qubit is shallowest, then uses the existing random choice to break any
+remaining tie. The depth tracking is undone by the same rollback Sabre already uses for its release valve.
+
+## Files
+
 ```
-crates/transpiler/src/passes/sabre/dag.rs    |  13 ++-   (SabreNode.num_2q)
-crates/transpiler/src/passes/sabre/layout.rs |   6 +-   (trial selection key)
-crates/transpiler/src/passes/sabre/route.rs  | 146 +++-  (depth tracker + selection_key + tied-swap filter)
-3 files changed, 159 insertions(+), 6 deletions(-)
+crates/transpiler/src/passes/sabre/dag.rs      13 +-   SabreNode.num_2q
+crates/transpiler/src/passes/sabre/layout.rs    6 +-   trial selection key
+crates/transpiler/src/passes/sabre/route.rs   146 +-   depth tracking, selection_key, swap tie-break
 ```
-Plus a release note and property tests (`test/python/transpiler/test_sabre_swap.py`).
+159 insertions, 6 deletions. Plus a release note and tests in `test/python/transpiler/test_sabre_swap.py`.
 
-## Validation (standalone, this change vs. clean baseline — official evaluator, 100 seeds)
-Verdict **PASS**, score **1.094834**. Two-qubit **depth −8.7%** (D2 ratio 0.9134, SE(log) 0.0051); two-qubit **gate
-count −0.6%, flat within noise** (passed; no per-case N2 above the 1.05× cap). Trade √(D2·N2) = 0.953. Correctness
-C1–C7 all pass; coupling-map legality preserved; deterministic for a fixed seed. The harness confirmed the evaluated
-tree differs from baseline by exactly these 3 files. Full detail: `design/validation-report.md`; reproduce with
-`design/validate.sh`.
+## Results
 
-## Honest notes
-- Development-panel result on the compact `iterations-profile` (QFT / square-Heisenberg / QAOA, 100 qubits, L2). It
-  isolates this change; it is not the full 8-family dev panel.
-- First of five stacked EAT Sabre changes; each lands as its own branch + standalone benchmark.
+Measured with Qiskit's transpiler benchmark harness, comparing this change against the same tree without it, 100
+transpilation seeds per case. Workloads: QFT, square-Heisenberg and QAOA at 100 qubits, on the cz, cx and ecr bases,
+at optimization level 2.
 
-## Provenance
-Produced by an Evolving-Agent-Teams run optimising Sabre for two-qubit depth, re-sliced as a standalone diff from the
-baseline. Run-history commits `2bba19308` (layout-trial key) and `f289d996a` (tied-swap filter).
+- Two-qubit depth: 8.7% lower (ratio 0.913).
+- Two-qubit gate count: 0.6% lower, i.e. unchanged within seed-to-seed variation. No individual case rose by more
+  than 5%.
+- Depth improved on all nine workload/basis combinations. The largest was square-Heisenberg at 11.9%.
+
+Correctness: the harness's equivalence checks all pass on the routed circuits (exact small-circuit equivalence,
+routing replay, and Clifford-variant equivalence). Every two-qubit gate in every output is on a coupling-map edge, and
+output is identical for a fixed seed whether or not parallel routing is enabled.
+
+Per-case numbers and the exact eval invocation are in `validation-report.md`, and `validate.sh` reproduces the run.
+
+## Notes
+
+- These numbers are from a three-workload panel, not Qiskit's full benchmark suite. They establish the effect of this
+  change in isolation. A wider run would give a per-family breakdown but is not needed to see what the tie-break does.
+- The two commits in the history are `2bba19308` (layout-trial key) and `f289d996a` (swap tie-break).

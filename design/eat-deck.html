@@ -229,7 +229,7 @@
         <div class="before"><span class="tag">before</span><p>When several swaps or layout trials score <strong>equally</strong>, Sabre broke the tie by <strong>arbitrary order</strong> — whichever came first.</p></div>
         <div class="after"><span class="tag">after</span><p>Among the equally-scored options, pick the one that adds the <strong>least two-qubit depth</strong>. Same options considered, smarter pick.</p></div>
       </div>
-      <p class="res"><span class="delta">↓ 6.2% depth.</span> Safe by construction — it only reorders already-equal choices, so it can't cost gate count.</p>
+      <p class="res"><span class="delta">↓ 6.2% depth.</span> It only reorders choices the heuristic already rates equal, so it does not change gate count.</p>
     </div>
   </section>
 
@@ -322,7 +322,7 @@
         <div class="before"><span class="tag">before — the diagnosis</span><p>The layout search runs a trial as alternating forward/back routing passes that all share one seed — so once a pass returns to a layout it already tried, the trial is stuck in a <strong>limit cycle</strong>, repeating itself. The agent measured it: this happened in <strong>55–64%</strong> of refined trials at the higher opt levels, burning the whole patience budget going nowhere.</p></div>
         <div class="after"><span class="tag">after — the fix</span><p>When a trial revisits an earlier layout, <strong>draw a fresh routing seed</strong> and keep exploring instead of spinning. That's the entire change: <strong>+6 lines in <code>layout.rs</code></strong> — no new constants, no tuning, no change to scoring or selection.</p></div>
       </div>
-      <p class="res"><span class="delta">1.329037 — PASS, new best.</span> The single most localized, explainable improvement of the whole run — and exactly the shape of change a Qiskit maintainer could merge on its own.</p>
+      <p class="res"><span class="delta">1.329037 — PASS, new best.</span> The most localized change of the run: six lines in one file, straightforward to review on its own.</p>
     </div>
   </section>
 

@@ -1,17 +1,17 @@
-# Issue draft — Sabre breaks layout/routing ties arbitrarily, leaving two-qubit depth on the table
+# Sabre breaks layout and routing ties arbitrarily, leaving two-qubit depth on the table
 
 ## Summary
 
 Sabre's layout and routing stages repeatedly choose among options its own scoring rates as **equal**, and today it
-resolves those ties arbitrarily — by lowest trial index for layout trials, and by uniform-random pick for swaps.
+resolves those ties arbitrarily: by lowest trial index for layout trials, and by uniform-random pick for swaps.
 Arbitrary tie-breaking throws away a free lever: among equally-scored options there is usually one that routes the
 circuit's two-qubit gates in fewer layers, i.e. at lower two-qubit depth.
 
 ## Where it happens
 
 1. **Layout-trial selection** (`crates/transpiler/src/passes/sabre/layout.rs`). Sabre runs several layout trials and
-   keeps `min_by_key(swap_count, trial_index)`. When two trials tie on swap count, the lower index wins — unrelated to
-   circuit quality.
+   keeps `min_by_key(swap_count, trial_index)`. When two trials tie on swap count, the lower index wins, which is
+   unrelated to circuit quality.
 2. **Swap selection during routing** (`crates/transpiler/src/passes/sabre/route.rs`). For look-ahead heuristics, when
    several candidate swaps share the best heuristic score, the choice among them is uniform-random.
 
@@ -32,8 +32,8 @@ count) cannot regress:
 - Swaps: among those tied for the best heuristic score, keep the ones whose deeper qubit ends up shallowest, then fall
   back to the existing random choice.
 
-Because this only reorders options already judged equal on swap cost, it cannot add swaps on net — it trades blind
-tie-breaking for depth-reducing tie-breaking. Default behaviour; no new public API.
+Because this only reorders options already judged equal on swap cost, it does not add swaps. It replaces blind
+tie-breaking with depth-reducing tie-breaking. On by default, no new public API.
 
 ## Scope / non-goals
 

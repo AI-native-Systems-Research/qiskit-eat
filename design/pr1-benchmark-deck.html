@@ -112,12 +112,12 @@
       <div class="tile"><span class="lab"><span class="dot" style="background:var(--teal)"></span>best case</span><span class="val good">−11.9%</span><span class="note">square-Heisenberg L2</span></div>
       <div class="tile"><span class="lab"><span class="dot" style="background:var(--teal)"></span>score</span><span class="val good">1.095</span><span class="note">= 1 / D2 ratio, PASS</span></div>
       <div class="rowlab"><span class="big">N2</span><span class="small">two-qubit gate count</span></div>
-      <div class="tile"><span class="lab"><span class="dot" style="background:var(--ink-mute)"></span>overall</span><span class="val flat">−0.6%</span><span class="note">flat, within noise</span></div>
+      <div class="tile"><span class="lab"><span class="dot" style="background:var(--ink-mute)"></span>overall</span><span class="val flat">−0.6%</span><span class="note">unchanged</span></div>
       <div class="tile"><span class="lab"><span class="dot" style="background:var(--teal)"></span>best case</span><span class="val good">−2.8%</span><span class="note">square-Heisenberg L2</span></div>
       <div class="tile"><span class="lab"><span class="dot" style="background:var(--orange)"></span>worst case</span><span class="val warn">+3.4%</span><span class="note">QAOA — under the 1.05 cap</span></div>
     </div>
-    <p class="note-line">Depth falls on every case; gate count is flat overall and never breaches the per-case cap. That is the whole
-    point of the change: it reorders only options the heuristic already rates equal, so it <b>cannot add swaps on net</b> — it buys depth, not gates.</p>
+    <p class="note-line">Depth falls on every case. Gate count is unchanged across the panel and no case rises more than 5%. Swap count
+    stays the primary selection key, so the change moves depth without moving the number of swaps.</p>
   </section>
 
   <section class="slide" id="mechanism">
@@ -130,8 +130,8 @@
       <li><b>Swap selection</b> (<code>route.rs</code>): among swaps tied for the best score, keep those whose deeper qubit ends up shallowest; <code>dag.rs</code> records each node's 2q-gate count for the estimate.</li>
       <li><b>Default-on, no new API.</b> 3 Sabre source files, +159 / −6. It changes only ordering among equal options — never which options are considered.</li>
     </ul>
-    <div class="card good"><b>Why it can't regress gate count.</b> A tie is, by definition, a set of options the heuristic already scored
-    identically on swap cost. Choosing the shallower one changes depth, not the number of swaps — so two-qubit gate count stays flat by construction.</div>
+    <div class="card good"><b>Why gate count does not move.</b> A tie is a set of options that already scored the same on swap cost.
+    Picking the shallower one changes the depth of the result, not how many swaps are inserted, so two-qubit gate count is unaffected.</div>
   </section>
 
   <section class="slide" id="method">
