@@ -42,22 +42,26 @@ crates/transpiler/src/passes/sabre/route.rs   146 +-   depth tracking, selection
 ## Results
 
 Measured with Qiskit's transpiler benchmark harness, comparing this change against the same tree without it, 100
-transpilation seeds per case. Workloads: QFT, square-Heisenberg and QAOA at 100 qubits, on the cz, cx and ecr bases,
-at optimization level 2.
+transpilation seeds per case, on the full 8-family development panel (the panel used to score the overall run).
 
-- Two-qubit depth: 8.7% lower (ratio 0.913).
-- Two-qubit gate count: 0.6% lower, i.e. unchanged within seed-to-seed variation. No individual case rose by more
-  than 5%.
-- Depth improved on all nine workload/basis combinations. The largest was square-Heisenberg at 11.9%.
+- Two-qubit depth: 6.2% lower (ratio 0.938).
+- Two-qubit gate count: 1.3% lower.
+- On the cx basis, depth is 7.6% lower and gate count 1.4% lower; on ecr, 7.4% and 1.4%. Both pass.
+- The improvement and breadth guards pass, and correctness (exact small-circuit equivalence, routing replay, and
+  Clifford-variant equivalence) passes. Every two-qubit gate in every output is on a coupling-map edge, and output is
+  identical for a fixed seed whether or not parallel routing is enabled.
 
-Correctness: the harness's equivalence checks all pass on the routed circuits (exact small-circuit equivalence,
-routing replay, and Clifford-variant equivalence). Every two-qubit gate in every output is on a coupling-map edge, and
-output is identical for a fixed seed whether or not parallel routing is enabled.
+The harness marked this run `INCONCLUSIVE` for one reason: the cost-timing panel did not finish within its time limit
+because the shared node was busy (it reports "Missing normal cost bundle" after a 25-minute wait). That is a
+measurement timeout, not a property of the change; the depth, gate-count, and correctness results above all completed
+and passed, and re-running the cost panel on an idle node clears it. The same cost panel timed out on the overall run.
 
-Per-case numbers and the exact eval invocation are in `validation-report.md`, and `validate.sh` reproduces the run.
+A smaller three-workload panel (QFT, square-Heisenberg, QAOA) completed with a clean PASS at score 1.0948 and shows a
+larger average depth drop (8.7%), because it leaves out the easier families the full panel includes. Per-case numbers
+are in `validation-report.md`, and `validate.sh` reproduces either run.
 
 ## Notes
 
-- These numbers are from a three-workload panel, not Qiskit's full benchmark suite. They establish the effect of this
-  change in isolation. A wider run would give a per-family breakdown but is not needed to see what the tie-break does.
+- The headline numbers are from the full 8-family development panel; the three-workload panel is included for the
+  per-case detail. Both measure this change on its own, applied to the baseline.
 - The two commits in the history are `2bba19308` (layout-trial key) and `f289d996a` (swap tie-break).

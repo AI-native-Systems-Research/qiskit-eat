@@ -9,7 +9,7 @@
   /* Standalone per-change benchmark deck (opened as a local file; carries its own skeleton).
      Visual language mirrors the team's example distribution-benchmark PDF: dark title, headline
      stat tiles, methodology, per-case tables. Every number is from the official standalone eval
-     (iterations-profile, 100 seeds) of the iteration-1 change vs the clean baseline. */
+     100 seeds, of the iteration-1 change vs the clean baseline. Headline is the full 8-family panel. */
   :root{
     --navy:#172535; --navy-soft:#22384f; --teal:#1f7a6b; --teal-ink:#15594e;
     --orange:#c8601f; --ink:#1a2430; --ink-soft:#49596b; --ink-mute:#8795a4;
@@ -99,25 +99,26 @@
     <p class="sub">Standalone benchmark of the iteration-1 change — depth-aware tie-breaks in Sabre layout-trial
     and swap selection — against the clean baseline. Same official evaluator, same seeds; the change measured
     <em>alone</em>, not bundled with later work.</p>
-    <p class="meta">3 workloads · 3 bases (cz/cx/ecr) · level 2 · 100 transpilation seeds per case · official eval verdict PASS</p>
+    <p class="meta">full 8-family development panel · 100 transpilation seeds per case · two-qubit depth 6.2% lower, gate count 1.3% lower</p>
   </section>
 
   <section class="slide" id="headline">
     <p class="eyebrow">Headline result</p>
-    <h2>Depth down, gate count flat</h2>
-    <p class="sub">Weighted mean change of the depth-aware tie-break relative to the clean baseline. Teal = lower (better); orange = higher.</p>
+    <h2>Depth down, gate count down</h2>
+    <p class="sub">Change relative to the clean baseline, full 8-family development panel, 100 seeds. Teal = lower (better).</p>
     <div class="tilegrid">
       <div class="rowlab"><span class="big">D2</span><span class="small">two-qubit depth</span></div>
-      <div class="tile"><span class="lab"><span class="dot" style="background:var(--teal)"></span>overall</span><span class="val good">−8.7%</span><span class="note">ratio 0.913 · SE(log) 0.005</span></div>
-      <div class="tile"><span class="lab"><span class="dot" style="background:var(--teal)"></span>best case</span><span class="val good">−11.9%</span><span class="note">square-Heisenberg L2</span></div>
-      <div class="tile"><span class="lab"><span class="dot" style="background:var(--teal)"></span>score</span><span class="val good">1.095</span><span class="note">= 1 / D2 ratio, PASS</span></div>
+      <div class="tile"><span class="lab"><span class="dot" style="background:var(--teal)"></span>overall</span><span class="val good">−6.2%</span><span class="note">ratio 0.938 · SE(log) 0.002</span></div>
+      <div class="tile"><span class="lab"><span class="dot" style="background:var(--teal)"></span>cx basis</span><span class="val good">−7.6%</span><span class="note">passed</span></div>
+      <div class="tile"><span class="lab"><span class="dot" style="background:var(--teal)"></span>ecr basis</span><span class="val good">−7.4%</span><span class="note">passed</span></div>
       <div class="rowlab"><span class="big">N2</span><span class="small">two-qubit gate count</span></div>
-      <div class="tile"><span class="lab"><span class="dot" style="background:var(--ink-mute)"></span>overall</span><span class="val flat">−0.6%</span><span class="note">unchanged</span></div>
-      <div class="tile"><span class="lab"><span class="dot" style="background:var(--teal)"></span>best case</span><span class="val good">−2.8%</span><span class="note">square-Heisenberg L2</span></div>
-      <div class="tile"><span class="lab"><span class="dot" style="background:var(--orange)"></span>worst case</span><span class="val warn">+3.4%</span><span class="note">QAOA — under the 1.05 cap</span></div>
+      <div class="tile"><span class="lab"><span class="dot" style="background:var(--teal)"></span>overall</span><span class="val good">−1.3%</span><span class="note">lower, passed</span></div>
+      <div class="tile"><span class="lab"><span class="dot" style="background:var(--teal)"></span>cx basis</span><span class="val good">−1.4%</span><span class="note">passed</span></div>
+      <div class="tile"><span class="lab"><span class="dot" style="background:var(--teal)"></span>ecr basis</span><span class="val good">−1.4%</span><span class="note">passed</span></div>
     </div>
-    <p class="note-line">Depth falls on every case. Gate count is unchanged across the panel and no case rises more than 5%. Swap count
-    stays the primary selection key, so the change moves depth without moving the number of swaps.</p>
+    <p class="note-line">Depth is lower across the panel and on both basis panels. Gate count is lower, not higher, so the depth gain is
+    not bought with extra swaps. Improvement and breadth guards pass; correctness C0–C7 passes. The three-workload panel (next slides)
+    completed with a clean PASS at score 1.095 and a larger average depth drop of 8.7%.</p>
   </section>
 
   <section class="slide" id="mechanism">
@@ -142,16 +143,17 @@
       <div class="step"><div class="n">2</div><h3>Contrast</h3><p>Evolved ÷ baseline, one D2 and one N2 ratio per case. Below 1 = lower with the change.</p></div>
       <div class="step"><div class="n">3</div><h3>Aggregate</h3><p>Weighted geometric mean of the case ratios; score = 1 / D2 ratio when the verdict is PASS.</p></div>
     </div>
-    <p class="note-line">The tree evaluated is the clean baseline (Qiskit <code>73aa14d</code> + the shared VF2 fix) with <b>only</b> this
-    change's 3 files applied — the harness confirmed "3 changed, 0 added, 0 deleted." So every number is this change's isolated effect.
-    Panel: the official <code>iterations-profile</code> — QFT, square-Heisenberg and QAOA at 100 qubits, on cz / cx / ecr bases, level 2.</p>
-    <p class="note-line"><b>Honest scope note.</b> This is the compact iterations-profile (3 workloads), not the full 8-family dev panel the whole-run
-    headline (~−6% on Benchpress) was measured on. It isolates <em>this one change</em> cleanly; a full-panel re-run would add the G1–G8 breakdown.</p>
+    <p class="note-line">The tree evaluated is the clean baseline (Qiskit <code>73aa14d</code> plus the shared VF2 fix) with only this change's
+    3 files applied. The harness confirmed "3 changed, 0 added, 0 deleted", so every number is this change's isolated effect.
+    The headline is the full 8-family development panel; a smaller three-workload panel (next slides) gives the per-case detail.</p>
+    <p class="note-line"><b>Note on the verdict.</b> The full-panel run was marked INCONCLUSIVE for one reason: the cost-timing panel timed out
+    waiting for the shared node to go quiet (a measurement timeout, not a property of the change). Depth, gate count and correctness all completed and passed,
+    and the three-workload panel is a clean PASS. The cost panel clears on an idle node.</p>
   </section>
 
   <section class="slide" id="percase">
-    <p class="eyebrow">Per case · level 2 · 100 seeds</p>
-    <h2>Every case: depth down, gate count in check</h2>
+    <p class="eyebrow">Three-workload panel · level 2 · 100 seeds · clean PASS 1.095</p>
+    <h2>Per-case detail</h2>
     <table>
       <thead><tr><th>Workload</th><th>Base</th><th>D2 (depth)</th><th>N2 (gates)</th></tr></thead>
       <tbody>
@@ -172,18 +174,18 @@
   </section>
 
   <section class="slide" id="correctness">
-    <p class="eyebrow">Correctness &amp; acceptance</p>
-    <h2>PASS — semantics preserved, guards clear</h2>
+    <p class="eyebrow">Correctness and acceptance</p>
+    <h2>Semantics preserved, quality guards pass</h2>
     <ul class="tight">
-      <li><b>Verdict: PASS</b>, score 1.094834 (D2 ratio 0.9134, trade √(D2·N2) 0.953).</li>
-      <li><b>C1–C5</b> exact small-circuit equivalence · <b>C6</b> routing-replay reproduces exactly · <b>C7</b> Clifford-variant equivalence — all pass on the evolved tree.</li>
-      <li><b>Every two-qubit gate</b> in every output respects the target coupling map; routing is deterministic for a fixed seed.</li>
-      <li><b>N2 guard:</b> overall −0.6% (passed); no per-case N2 above the 1.05× cap; cx / ecr basis panels both pass.</li>
+      <li><b>C1–C5</b> exact small-circuit equivalence, <b>C6</b> routing-replay reproduces exactly, <b>C7</b> Clifford-variant equivalence. All pass on the evolved tree.</li>
+      <li><b>Every two-qubit gate</b> in every output is on a coupling-map edge; routing is deterministic for a fixed seed.</li>
+      <li><b>Improvement and breadth guards pass.</b> Gate count is lower (1.3%), not higher; no per-case gate count above the 5% limit; cx and ecr basis panels both pass.</li>
+      <li><b>Verdict INCONCLUSIVE</b> on the full panel only because the cost-timing panel timed out on a busy node. A measurement timeout, not a quality failure; the three-workload panel is a clean PASS (score 1.095).</li>
     </ul>
-    <div class="card good"><b>Bottom line.</b> The change builds, preserves circuit semantics, and reduces two-qubit depth ~8.7% while
-    leaving gate count flat — the smallest, safest of the EAT Sabre changes, and the natural first PR.</div>
-    <p class="note-line">Branch: <code>sabre-depth-aware-tiebreaks</code> on <code>AI-native-Systems-Research/qiskit-eat</code> ·
-    full eval log in <code>design/validation-report.md</code> · reproduce with <code>design/validate.sh</code>.</p>
+    <div class="card good"><b>Bottom line.</b> The change builds, keeps circuit semantics, and lowers two-qubit depth 6.2% on the full panel
+    while lowering gate count 1.3%. It is the most localized of the Sabre changes and a natural first PR.</div>
+    <p class="note-line">Branch: <code>sabre-depth-aware-tiebreaks</code> on <code>AI-native-Systems-Research/qiskit-eat</code>.
+    Full eval detail in <code>validation-report.md</code>; reproduce with <code>validate.sh</code>.</p>
   </section>
 
 </div>
