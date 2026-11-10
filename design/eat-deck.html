@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>EAT Run Deck</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap">
+<style>
+  /* Standalone slide deck (opened as a local file, so it carries its own document skeleton). One idea per slide;
+     slides are hidden by default and the current one is shown via a .current class — no dependency on any host CSS. */
+  :root {
+    --bg:#f6f5f1; --surface:#fcfbf8; --surface-2:#efede5;
+    --ink:#15140f; --ink-soft:#514f49; --ink-mute:#8a877f; --line:#e3e0d7;
+    --accent:#2a78d6; --accent-deep:#184f95; --good:#0ca30c; --warn:#c2561f; --thread:#cbc7ba;
+    --font-display:"Fraunces", Georgia, "Times New Roman", serif;
+    --font-body:"Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono:ui-monospace, "SFMono-Regular", "Cascadia Code", Menlo, Consolas, monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+    --bg:#0d0d0c; --surface:#181816; --surface-2:#201f1c;
+    --ink:#f1f0ec; --ink-soft:#c6c5ba; --ink-mute:#908e86; --line:#2b2b28;
+    --accent:#3987e5; --accent-deep:#9cc2f0; --good:#35c135; --warn:#e8743f; --thread:#39382f; color-scheme:dark; }}
+  :root[data-theme="dark"]{
+    --bg:#0d0d0c; --surface:#181816; --surface-2:#201f1c;
+    --ink:#f1f0ec; --ink-soft:#c6c5ba; --ink-mute:#908e86; --line:#2b2b28;
+    --accent:#3987e5; --accent-deep:#9cc2f0; --good:#35c135; --warn:#e8743f; --thread:#39382f; color-scheme:dark; }
+
+  * { box-sizing:border-box; }
+  html, body { height:100%; margin:0; }
+  body { background:var(--bg); color:var(--ink); font-family:var(--font-body); overflow:hidden;
+         -webkit-font-smoothing:antialiased; }
+  h1,h2,h3 { font-family:var(--font-display); font-weight:600; line-height:1.08; margin:0; text-wrap:balance;
+             letter-spacing:-0.015em; }
+  p { margin:0; }
+
+  .deck { position:relative; width:100%; height:100vh; height:100dvh; }
+
+  /* --- the visibility mechanism: hidden by default, current shown. No reliance on [hidden]. --- */
+  .slide { display:none; position:absolute; inset:0; flex-direction:column; justify-content:center;
+           gap:clamp(0.7rem,2vh,1.4rem);
+           padding: max(1.4rem, env(safe-area-inset-top,0px)) max(20px, env(safe-area-inset-right,0px)) calc(84px + env(safe-area-inset-bottom,0px)) max(20px, env(safe-area-inset-left,0px));
+           overflow-y:auto; }
+  .slide.current { display:flex; }
+  .inner { width:100%; max-width:860px; margin-inline:auto; }
+  @media (prefers-reduced-motion: no-preference){
+    .slide.current .inner { animation: rise .4s cubic-bezier(.2,.7,.3,1) both; }
+    @keyframes rise { from{ opacity:.001; transform:translateY(16px); } to{ opacity:1; transform:none; } }
+  }
+
+  .eyebrow { font-family:var(--font-mono); font-size:clamp(0.68rem,1.5vw,0.78rem); letter-spacing:0.2em;
+             text-transform:uppercase; color:var(--accent); margin-bottom:1rem; }
+  .big { font-size:clamp(2rem,6.2vw,4rem); }
+  .sub { color:var(--ink-soft); font-size:clamp(1rem,2.4vw,1.35rem); max-width:46ch; margin-top:1.1rem; line-height:1.5; }
+
+  .ihead { display:flex; align-items:center; gap:0.9rem; flex-wrap:wrap; margin-bottom:0.3rem; }
+  .ix { font-family:var(--font-mono); font-size:clamp(0.72rem,1.6vw,0.85rem); letter-spacing:0.12em; color:var(--accent);
+        border:1px solid var(--accent); border-radius:999px; padding:0.2rem 0.75rem; white-space:nowrap; }
+  .score { margin-left:auto; font-family:var(--font-display); font-weight:700; font-variant-numeric:tabular-nums;
+           font-size:clamp(2.2rem,6vw,3.6rem); color:var(--accent); line-height:1; }
+  .score.muted { color:var(--ink-mute); font-size:clamp(1.1rem,3vw,1.5rem); }
+  .islide h2 { font-size:clamp(1.5rem,4vw,2.4rem); margin:0.2rem 0 0; }
+
+  .team { display:flex; flex-wrap:wrap; gap:0.5rem; margin:1.1rem 0; }
+  .agent { display:inline-flex; align-items:center; gap:0.45rem; font-family:var(--font-mono);
+           font-size:clamp(0.75rem,1.7vw,0.9rem); background:var(--surface-2); color:var(--ink-soft);
+           border-radius:999px; padding:0.3rem 0.8rem 0.3rem 0.55rem; }
+  .agent::before { content:""; width:0.6rem; height:0.6rem; border-radius:50%; background:var(--thread); }
+  .agent.new { background:color-mix(in srgb, var(--accent) 15%, var(--surface-2)); color:var(--accent-deep); font-weight:600; }
+  .agent.new::before { background:var(--accent); }
+  .agent.gate::before { background:var(--good); }
+
+  .rows { display:grid; gap:0.9rem; margin-top:0.4rem; }
+  .row .lbl { font-family:var(--font-mono); font-size:0.66rem; letter-spacing:0.1em; text-transform:uppercase;
+              color:var(--ink-mute); margin-bottom:0.2rem; }
+  .row p { color:var(--ink-soft); font-size:clamp(0.95rem,2vw,1.12rem); line-height:1.5; }
+  .row p strong { color:var(--ink); font-weight:600; }
+  .delta { font-family:var(--font-mono); font-weight:600; color:var(--good); }
+  /* why-line + the before→after contrast that gives each change its context */
+  .why { color:var(--ink-soft); font-size:clamp(0.9rem,1.95vw,1.08rem); line-height:1.45; margin:0.2rem 0 0.9rem; }
+  .why strong { color:var(--ink); font-weight:600; }
+  .ba { border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  .ba > div { padding:0.75rem 1rem; position:relative; }
+  .ba .before { background:var(--surface-2); }
+  .ba .after { border-top:1px solid var(--line); background:color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+  .ba .tag { font-family:var(--font-mono); font-size:0.62rem; letter-spacing:0.14em; text-transform:uppercase; display:inline-block; margin-bottom:0.25rem; }
+  .ba .before .tag { color:var(--warn); }
+  .ba .after .tag { color:var(--accent); }
+  .ba p { font-size:clamp(0.9rem,1.9vw,1.06rem); line-height:1.45; }
+  .ba .before p { color:var(--ink-mute); }
+  .ba .after p { color:var(--ink-soft); }
+  .ba p strong { color:var(--ink); font-weight:600; }
+  .res { margin-top:0.8rem; font-size:clamp(0.92rem,1.95vw,1.08rem); color:var(--ink-soft); line-height:1.45; }
+  .res strong { color:var(--ink); font-weight:600; }
+  code { font-family:var(--font-mono); font-size:0.88em; background:var(--surface-2); padding:0.08em 0.4em; border-radius:4px; }
+
+  .cycle { display:grid; grid-template-columns:repeat(4,1fr); gap:0.8rem; margin-top:1.6rem; }
+  .cycle .step { background:var(--surface-2); border-radius:14px; padding:1rem 1rem 1.1rem; }
+  .cycle .n { font-family:var(--font-mono); font-size:0.72rem; color:var(--accent); }
+  .cycle h3 { font-size:clamp(1rem,2vw,1.2rem); margin:0.3rem 0; }
+  .cycle p { font-size:clamp(0.82rem,1.6vw,0.95rem); color:var(--ink-soft); line-height:1.4; }
+  @media (max-width:640px){ .cycle { grid-template-columns:repeat(2,1fr); } }
+
+  figure { margin:0; }
+  svg { display:block; width:100%; height:auto; max-width:100%; }
+  figcaption { color:var(--ink-mute); font-size:clamp(0.78rem,1.6vw,0.9rem); margin-top:0.8rem; }
+
+  .cmp { display:grid; grid-template-columns:1fr 1fr; gap:clamp(1rem,3vw,2rem); margin-top:1.4rem; align-items:start; }
+  .cmp .col h3 { font-size:clamp(1rem,2.2vw,1.25rem); display:flex; justify-content:space-between; align-items:baseline; gap:0.5rem; }
+  .cmp .num { font-family:var(--font-display); font-weight:700; font-size:clamp(2.6rem,9vw,4.4rem); line-height:1; margin:0.5rem 0 0.2rem; font-variant-numeric:tabular-nums; }
+  .cmp .num.bad { color:var(--warn); } .cmp .num.good { color:var(--good); }
+  .cmp .unit { font-size:clamp(0.8rem,1.6vw,0.92rem); color:var(--ink-mute); }
+  .dots { display:flex; flex-wrap:wrap; gap:5px; margin-top:0.9rem; }
+  .dot { width:clamp(12px,3vw,16px); height:clamp(12px,3vw,16px); border-radius:50%; }
+  .dot.bad { background:var(--warn); } .dot.ok { background:var(--good); opacity:0.3; }
+  .cmp .note { font-size:clamp(0.82rem,1.6vw,0.95rem); color:var(--ink-soft); margin-top:0.8rem; line-height:1.45; }
+
+  .callout { border-left:3px solid var(--warn); background:var(--surface-2); border-radius:0 12px 12px 0;
+             padding:1rem 1.25rem; color:var(--ink-soft); font-size:clamp(0.9rem,1.9vw,1.05rem); line-height:1.5; }
+  .callout strong { color:var(--ink); }
+
+  .arcline { display:flex; flex-wrap:wrap; align-items:center; gap:0.5rem; margin-top:0.6rem; font-family:var(--font-mono);
+             font-size:clamp(0.78rem,1.7vw,0.95rem); color:var(--ink-soft); }
+  .arcline .n { color:var(--accent); font-weight:600; }
+  .arcline .ar { color:var(--thread); }
+
+  .prog { position:fixed; top:0; left:0; right:0; height:3px; background:transparent; z-index:20; }
+  .prog > i { display:block; height:100%; background:var(--accent); width:0; transition:width .3s ease; }
+
+  .bar { position:fixed; left:0; right:0; bottom:0; z-index:20; display:flex; align-items:center; justify-content:center;
+         gap:1rem; height:64px; padding:0 max(16px,env(safe-area-inset-right,0px)) env(safe-area-inset-bottom,0px) max(16px,env(safe-area-inset-left,0px));
+         background:color-mix(in srgb, var(--bg) 85%, transparent); backdrop-filter:blur(10px); border-top:1px solid var(--line); }
+  .nav { appearance:none; border:1px solid var(--line); background:var(--surface-2); color:var(--ink); cursor:pointer;
+         width:40px; height:40px; border-radius:10px; font-size:1.1rem; display:grid; place-items:center; }
+  .nav:hover { border-color:var(--accent); color:var(--accent); }
+  .nav:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .dotsnav { display:flex; gap:6px; align-items:center; }
+  .pip { width:8px; height:8px; border-radius:50%; background:var(--thread); border:0; padding:0; cursor:pointer; }
+  .pip.on { background:var(--accent); transform:scale(1.35); }
+  .counter { font-family:var(--font-mono); font-size:0.78rem; color:var(--ink-mute); font-variant-numeric:tabular-nums;
+             min-width:4.5rem; text-align:right; }
+  @media (max-width:560px){ .dotsnav{ display:none; } .counter{ min-width:3.5rem; } }
+  .hint { position:fixed; bottom:calc(72px + env(safe-area-inset-bottom,0px)); left:50%; transform:translateX(-50%);
+          font-family:var(--font-mono); font-size:0.72rem; color:var(--ink-mute); z-index:20; opacity:0.85; pointer-events:none; }
+</style>
+</head>
+<body>
+
+<div class="prog"><i id="progbar"></i></div>
+
+<div class="deck" id="deck">
+
+  <section class="slide current" id="start">
+    <div class="inner">
+      <p class="eyebrow">Evolving Agent Teams · Qiskit transpiler</p>
+      <h1 class="big">A team of agents<br>taught itself to<br>compile better</h1>
+      <p class="sub">Each round, a supervisor agent redesigns the team, sets it loose on Qiskit's Sabre layout-and-routing
+        passes, and evolves it from the result. This is that run — team by team.</p>
+    </div>
+  </section>
+
+  <section class="slide" id="loop">
+    <div class="inner">
+      <p class="eyebrow">The method</p>
+      <h2 class="big" style="font-size:clamp(1.6rem,4.5vw,2.8rem)">One loop, repeated each iteration</h2>
+      <div class="cycle">
+        <div class="step"><div class="n">01</div><h3>Design</h3><p>A supervisor agent decides what team the next round needs — roles, size, workflow.</p></div>
+        <div class="step"><div class="n">02</div><h3>Build</h3><p>That team of coding agents edits only the Sabre transpiler passes.</p></div>
+        <div class="step"><div class="n">03</div><h3>Score</h3><p>An independent evaluation measures two-qubit depth and every correctness guard.</p></div>
+        <div class="step"><div class="n">04</div><h3>Evolve</h3><p>The supervisor reads the result and redesigns the team for the next round.</p></div>
+      </div>
+      <p class="sub" style="max-width:60ch">Goal: lower the <strong style="color:var(--ink)">two-qubit depth</strong> of compiled circuits — what hurts most on real hardware — without breaking correctness or inflating gate count.</p>
+    </div>
+  </section>
+
+  <section class="slide" id="baseline">
+    <div class="inner">
+      <p class="eyebrow">The starting point</p>
+      <h2 class="big" style="font-size:clamp(1.6rem,4.5vw,2.8rem)">What Sabre does, and where it left depth on the table</h2>
+      <p class="why" style="max-width:62ch">Sabre is Qiskit's router: it picks an initial <strong>layout</strong> (which logical qubit goes where) and then <strong>routes</strong> — inserting swap gates so every two-qubit gate lands on physically-connected qubits. Swaps add depth. Sabre tries several random layout <em>trials</em>, routes them, and keeps the best.</p>
+      <div class="ba" style="max-width:62ch">
+        <div class="before"><span class="tag">what we optimize — depth (D2)</span><p>The score pushes down <strong>two-qubit depth</strong>: how many layers of 2-qubit gates run in series. It's what limits circuits on today's noisy hardware.</p></div>
+        <div class="after"><span class="tag">what we protect — gate count (N2) + correctness</span><p>The obvious cheat is to cut depth by <strong>adding swaps</strong> — fewer layers, but more gates. So 2-qubit <strong>gate count can't regress</strong> (a hard guard), nor can correctness, compile time or memory. Depth only counts if nothing else gets worse.</p></div>
+      </div>
+      <p class="res" style="max-width:62ch">The untouched levers the agents went after: <strong>how ties break, what trials are scored by, how far the router looks ahead, and where routing effort is spent</strong> — each iteration takes one.</p>
+    </div>
+  </section>
+
+  <section class="slide" id="score">
+    <div class="inner">
+      <p class="eyebrow">The result in one line</p>
+      <h2 class="big" style="font-size:clamp(1.6rem,4.5vw,2.8rem)">The score climbed every iteration</h2>
+      <figure>
+        <svg viewBox="0 0 800 400" role="img" aria-label="Score rising from 1.066 at iteration 1 to 1.329 at iteration 10">
+          <g stroke="var(--line)" stroke-width="1">
+            <line x1="120" y1="348" x2="690" y2="348"/><line x1="120" y1="266.9" x2="690" y2="266.9"/>
+            <line x1="120" y1="185.8" x2="690" y2="185.8"/><line x1="120" y1="104.7" x2="690" y2="104.7"/>
+          </g>
+          <g fill="var(--ink-mute)" font-size="13" font-family="var(--font-mono)" text-anchor="end" style="font-variant-numeric:tabular-nums">
+            <text x="106" y="352">1.00</text><text x="106" y="270.9">1.10</text><text x="106" y="189.8">1.20</text><text x="106" y="108.7">1.30</text>
+          </g>
+          <path d="M 120,348 L 120,294.5 L 232,246.6 L 344,145.3 L 456,107.1 L 568,86.1 L 680,81.2 L 680,348 Z" fill="var(--accent)" fill-opacity="0.12"/>
+          <polyline points="120,294.5 232,246.6 344,145.3 456,107.1 568,86.1 680,81.2" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+          <circle cx="120" cy="294.5" r="5.5" fill="var(--accent)" stroke="var(--bg)" stroke-width="2"/>
+          <circle cx="232" cy="246.6" r="5.5" fill="var(--accent)" stroke="var(--bg)" stroke-width="2"/>
+          <circle cx="344" cy="145.3" r="5.5" fill="var(--accent)" stroke="var(--bg)" stroke-width="2"/>
+          <circle cx="456" cy="107.1" r="5.5" fill="var(--accent)" stroke="var(--bg)" stroke-width="2"/>
+          <circle cx="568" cy="86.1" r="5.5" fill="var(--accent)" stroke="var(--bg)" stroke-width="2"/>
+          <circle cx="680" cy="81.2" r="6.5" fill="var(--accent-deep)" stroke="var(--bg)" stroke-width="2"/>
+          <g fill="var(--ink)" font-size="15" font-family="var(--font-display)" font-weight="600" text-anchor="middle" style="font-variant-numeric:tabular-nums">
+            <text x="120" y="278.5">1.066</text><text x="232" y="230.6">1.125</text><text x="344" y="129.3">1.250</text><text x="456" y="91.1">1.297</text><text x="556" y="73">1.323</text><text x="690" y="65">1.329</text>
+          </g>
+          <g fill="var(--ink-soft)" font-size="13" text-anchor="middle">
+            <text x="120" y="374">Iter 1</text><text x="232" y="374">Iter 2</text><text x="344" y="374">Iter 3</text><text x="456" y="374">Iter 6*</text><text x="568" y="374">Iter 9</text><text x="680" y="374">Iter 10</text>
+          </g>
+        </svg>
+        <figcaption><strong>Score 1.00 = baseline Sabre.</strong> Score = 1 / two-qubit-depth ratio, counted only on a passing evaluation. Each point builds on the last; iteration 10 compiles ~25% shallower than baseline. (*The 1.297 candidate came from iteration 6, re-scored by a clean evaluator after a cluster-eval bug; iterations 9–10 are the continuation's clean official scores.)</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="slide islide" id="i1">
+    <div class="inner">
+      <div class="ihead"><span class="ix">ITER 1</span><span class="score">1.066</span></div>
+      <h2>Make the tie-breaks depth-aware</h2>
+      <div class="team"><span class="agent new">optimizer</span></div>
+      <p class="why"><strong>Why one agent:</strong> with no idea yet where depth is lost, the cheapest move is a single agent that diagnoses and takes the one safe win.</p>
+      <div class="ba">
+        <div class="before"><span class="tag">before</span><p>When several swaps or layout trials score <strong>equally</strong>, Sabre broke the tie by <strong>arbitrary order</strong> — whichever came first.</p></div>
+        <div class="after"><span class="tag">after</span><p>Among the equally-scored options, pick the one that adds the <strong>least two-qubit depth</strong>. Same options considered, smarter pick.</p></div>
+      </div>
+      <p class="res"><span class="delta">↓ 6.2% depth.</span> Safe by construction — it only reorders already-equal choices, so it can't cost gate count.</p>
+    </div>
+  </section>
+
+  <section class="slide islide" id="i2">
+    <div class="inner">
+      <div class="ihead"><span class="ix">ITER 2</span><span class="score">1.125</span></div>
+      <h2>Pick better layout trials, cheaply</h2>
+      <div class="team"><span class="agent new">router</span><span class="agent new">layout</span><span class="agent new">integrator</span></div>
+      <p class="why"><strong>Why 3 agents:</strong> iter 1 only touched tie-breaks. Split the problem by stage — router + layout exploring in parallel — with an <strong>integrator</strong> that owns timing and is the only one allowed to ship.</p>
+      <div class="ba">
+        <div class="before"><span class="tag">before</span><p>Layout trials were ranked by <strong>swap count</strong>, and <strong>every</strong> trial got a full, expensive routing pass — effort spread thin across all of them.</p></div>
+        <div class="after"><span class="tag">after</span><p>Rank trials by a <strong>depth estimate</strong> instead, and <strong>screen</strong>: route every trial once cheaply, then fully route only the best four. Effort goes where it matters.</p></div>
+      </div>
+      <p class="res"><span class="delta">↓ 11.1% depth.</span> The integrator also <strong>rejected two of its own team's candidates</strong> (thin evidence; a risky cap for +0.75%) — the discipline that keeps the score honest.</p>
+    </div>
+  </section>
+
+  <section class="slide islide" id="i3">
+    <div class="inner">
+      <div class="ihead"><span class="ix">ITER 3</span><span class="score">1.250</span></div>
+      <h2>Give the basic router real lookahead</h2>
+      <div class="team"><span class="agent">router</span><span class="agent">layout</span><span class="agent">integrator</span></div>
+      <p class="why"><strong>Why the same team:</strong> the structure worked, so the supervisor changed the <strong>targets, not the roles</strong> — aim at the weakest router and the families with the most headroom left.</p>
+      <div class="ba">
+        <div class="before"><span class="tag">before</span><p>Qiskit's level-0 ("basic") router was nearly <strong>greedy</strong> — it took the locally-best swap with little sense of what came next.</p></div>
+        <div class="after"><span class="tag">after</span><p>A real <strong>lookahead heuristic</strong> — lookahead + decay + a depth window — fed by halving-and-refinement of the layout trials. Both explorers' work <strong>merged into one change</strong>.</p></div>
+      </div>
+      <p class="res"><span class="delta">↓ 20% depth</span> — the biggest single jump of the run, and EAT's clearest act of combining two agents' ideas.</p>
+    </div>
+  </section>
+
+  <section class="slide" id="turn">
+    <div class="inner">
+      <p class="eyebrow" style="color:var(--warn)">The turn</p>
+      <h2 class="big" style="font-size:clamp(1.7rem,5vw,3rem)">Was it real — or was it learning the test?</h2>
+      <p class="sub" style="max-width:54ch">The score was climbing on the panel the agents <em>can see</em>. A held-out check — circuits they never train on — gave the uncomfortable answer.</p>
+      <div class="callout" style="margin-top:1.4rem"><strong>Iteration 3 quietly made 8 circuits worse</strong> on the held-out set — up to +10% worse. Classic over-fitting. The supervisor was told. What it did next is the most interesting part of the run.</div>
+    </div>
+  </section>
+
+  <section class="slide islide" id="i4">
+    <div class="inner">
+      <div class="ihead"><span class="ix">ITER 4</span><span class="score muted">re-aimed</span></div>
+      <h2>Build a team to catch yourself cheating</h2>
+      <div class="team"><span class="agent new">auditor</span><span class="agent new">mechanic</span><span class="agent">integrator</span></div>
+      <p class="why"><strong>Why a new kind of team:</strong> the goal itself changed. Add an <strong>auditor</strong> whose only job is to build a held-out suite the others never see, map every regression, and blame each on a specific mechanism.</p>
+      <div class="ba">
+        <div class="before"><span class="tag">the goal until now</span><p>"<strong>Raise the dev score.</strong>" Which, unchecked, rewards tuning to the circuits the agents can see — the over-fitting the turn exposed.</p></div>
+        <div class="after"><span class="tag">the goal from here</span><p>"<strong>Stop over-fitting.</strong>" Explicit target: at least <strong>halve the held-out regressions</strong>. The mechanic repairs the named weak clusters while holding the score.</p></div>
+      </div>
+      <p class="res">The run turned from score-chasing to robustness. (Real work — scored 0 only by a cluster-evaluator bug, recovered later.)</p>
+    </div>
+  </section>
+
+  <section class="slide islide" id="i56">
+    <div class="inner">
+      <div class="ihead"><span class="ix">ITER 5–6</span><span class="score">1.297</span></div>
+      <h2>Spend extra routing only where it pays</h2>
+      <div class="team"><span class="agent">layout</span><span class="agent">router</span><span class="agent">integrator</span></div>
+      <p class="why"><strong>Why these fixers:</strong> explorers-plus-gatekeeper again, but each pointed at a <strong>named weak cluster</strong> the auditor found, owing a study of where depth is lost and a principled fix.</p>
+      <div class="ba">
+        <div class="before"><span class="tag">before</span><p>The chosen layout got a <strong>fixed amount of routing effort</strong> — take it or leave it, no second look even when a circuit might benefit.</p></div>
+        <div class="after"><span class="tag">after</span><p><strong>One extra routing-trial batch</strong> for the chosen layout — but kept <strong>only if it beats the incumbent on both</strong> swap cost models. Extra compute spent only when it clearly pays.</p></div>
+      </div>
+      <p class="res"><span class="delta">↓ 22.9% depth</span> — and it did it while generalising better (next slide).</p>
+    </div>
+  </section>
+
+  <section class="slide islide" id="i9">
+    <div class="inner">
+      <div class="ihead"><span class="ix">ITER 9 · live continuation</span><span class="score">1.323</span></div>
+      <h2>Pick up from the best, and push further</h2>
+      <div class="team"><span class="agent new">explorer</span><span class="agent new">integrator</span><span class="agent new">cost</span></div>
+      <p class="why"><strong>Why resume:</strong> with the best solution (1.297) banked and the evaluation infrastructure fixed, a fresh supervisor restarted from that tree — told the true state and to keep each change localized and general — with a dedicated <strong>cost</strong> agent watching the compile-time budget.</p>
+      <div class="ba">
+        <div class="before"><span class="tag">before — the 1.297 tree</span><p>The best solution so far, but the extra-routing-batch logic only ever reconsidered the <strong>one</strong> layout the earlier stages had already chosen.</p></div>
+        <div class="after"><span class="tag">after — iteration 9</span><p>Further refinement across the Sabre search, with the biggest gains on the hardest routing-challenge circuits (compiling those roughly <strong>half as deep</strong> as baseline). Still 6–7 files, all in the Sabre pass.</p></div>
+      </div>
+      <p class="res"><span class="delta">1.323 — PASS, best of the run.</span> Scored by the real evaluator (the fix that unblocked it is proven end-to-end), on the same panel as every earlier iteration.</p>
+    </div>
+  </section>
+
+  <section class="slide islide" id="i10">
+    <div class="inner">
+      <div class="ihead"><span class="ix">ITER 10 · new best</span><span class="score">1.329</span></div>
+      <h2>One cause, one file, six lines</h2>
+      <div class="team"><span class="agent new">layout</span><span class="agent new">router</span><span class="agent new">integrator</span></div>
+      <p class="why"><strong>Why this team:</strong> a fresh supervisor split the Sabre pass by stage — one agent owning <strong>layout</strong> (where qubits start), one owning <strong>routing</strong> (which swaps get inserted), and an <strong>integrator</strong> acting as maintainer-reviewer and the only agent allowed to change the shared tree. Each was told to find <em>one</em> localized, explainable cause and fix it like a real pull request.</p>
+      <div class="ba">
+        <div class="before"><span class="tag">before — the diagnosis</span><p>The layout search runs a trial as alternating forward/back routing passes that all share one seed — so once a pass returns to a layout it already tried, the trial is stuck in a <strong>limit cycle</strong>, repeating itself. The agent measured it: this happened in <strong>55–64%</strong> of refined trials at the higher opt levels, burning the whole patience budget going nowhere.</p></div>
+        <div class="after"><span class="tag">after — the fix</span><p>When a trial revisits an earlier layout, <strong>draw a fresh routing seed</strong> and keep exploring instead of spinning. That's the entire change: <strong>+6 lines in <code>layout.rs</code></strong> — no new constants, no tuning, no change to scoring or selection.</p></div>
+      </div>
+      <p class="res"><span class="delta">1.329037 — PASS, new best.</span> The single most localized, explainable improvement of the whole run — and exactly the shape of change a Qiskit maintainer could merge on its own.</p>
+    </div>
+  </section>
+
+  <section class="slide" id="noscheat">
+    <div class="inner">
+      <p class="eyebrow">Did it cheat? — depth vs gate count</p>
+      <h2 class="big" style="font-size:clamp(1.5rem,4vw,2.4rem)">Fewer layers <em>and</em> fewer gates</h2>
+      <p class="why" style="max-width:60ch">If the agents had bought depth by adding swaps, the blue bars (depth) would grow while the gate-count bars stayed flat or rose. Instead, at iteration 9, <strong>both</strong> drop at every optimization level — genuinely better routing, not a trade.</p>
+      <figure>
+        <svg viewBox="0 0 800 320" role="img" aria-label="Both two-qubit depth and two-qubit gate count fall below baseline at every optimization level">
+          <!-- baseline = 1.0 reference line -->
+          <line x1="90" y1="70" x2="710" y2="70" stroke="var(--ink-mute)" stroke-width="1.5" stroke-dasharray="4 4"/>
+          <text x="90" y="62" fill="var(--ink-mute)" font-size="13" font-family="var(--font-mono)">baseline = 1.00 (no change)</text>
+          <!-- bars hang down from baseline; longer = more reduction -->
+          <!-- L0 -->
+          <rect x="140" y="70" width="40" height="160.8" rx="4" fill="var(--accent)"/>
+          <rect x="190" y="70" width="40" height="100.0" rx="4" fill="var(--accent-deep)" opacity="0.55"/>
+          <!-- L1 -->
+          <rect x="280" y="70" width="40" height="135.2" rx="4" fill="var(--accent)"/>
+          <rect x="330" y="70" width="40" height="64.8" rx="4" fill="var(--accent-deep)" opacity="0.55"/>
+          <!-- L2 -->
+          <rect x="420" y="70" width="40" height="131.4" rx="4" fill="var(--accent)"/>
+          <rect x="470" y="70" width="40" height="60.8" rx="4" fill="var(--accent-deep)" opacity="0.55"/>
+          <!-- L3 -->
+          <rect x="560" y="70" width="40" height="118.2" rx="4" fill="var(--accent)"/>
+          <rect x="610" y="70" width="40" height="44.4" rx="4" fill="var(--accent-deep)" opacity="0.55"/>
+          <!-- reduction labels (below each bar bottom) -->
+          <g fill="var(--ink-soft)" font-size="12.5" font-family="var(--font-mono)" text-anchor="middle" style="font-variant-numeric:tabular-nums">
+            <text x="160" y="248">-29%</text><text x="210" y="188">-18%</text>
+            <text x="300" y="222">-24%</text><text x="350" y="152">-12%</text>
+            <text x="440" y="218">-23%</text><text x="490" y="148">-11%</text>
+            <text x="580" y="205">-21%</text><text x="630" y="132">-8%</text>
+          </g>
+          <!-- level group labels -->
+          <g fill="var(--ink)" font-size="15" font-family="var(--font-display)" font-weight="600" text-anchor="middle">
+            <text x="185" y="280">opt 0</text><text x="325" y="280">opt 1</text><text x="465" y="280">opt 2</text><text x="605" y="280">opt 3</text>
+          </g>
+        </svg>
+        <figcaption>Iteration 9, full dev panel. Bars show reduction below baseline (down = better). Across levels: depth −21% to −29%, two-qubit gate count −8% to −18% — and up to ~50% / 33% on the hardest routing-challenge circuits.</figcaption>
+      </figure>
+      <div class="legend" style="display:flex;gap:1.4rem;margin-top:0.2rem;font-size:0.85rem;color:var(--ink-soft);justify-content:center">
+        <span style="display:inline-flex;align-items:center;gap:0.4rem"><span style="width:0.9rem;height:0.9rem;border-radius:3px;background:var(--accent);display:inline-block"></span>two-qubit depth (D2) — the target</span>
+        <span style="display:inline-flex;align-items:center;gap:0.4rem"><span style="width:0.9rem;height:0.9rem;border-radius:3px;background:var(--accent-deep);opacity:0.55;display:inline-block"></span>two-qubit gate count (N2) — the guard</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" id="benchpress">
+    <div class="inner">
+      <p class="eyebrow">Independent benchmark — IBM Benchpress</p>
+      <h2 class="big" style="font-size:clamp(1.5rem,4vw,2.4rem)">The win holds on a suite we never trained on</h2>
+      <p class="why" style="max-width:62ch">The dev panel and the held-out set are both <em>our</em> circuits. Benchpress is IBM's own public transpiler benchmark — different circuits, different metrics, run by its harness. We compiled <strong>18,738 circuits</strong> (both optimization levels, 3 seeds) on the 1.323 tree vs. baseline. An A/A control confirmed the measurement is exact.</p>
+      <div class="cmp" style="grid-template-columns:repeat(3,1fr)">
+        <div class="col" style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1rem">
+          <div class="num good" style="font-size:clamp(2rem,6vw,3rem)">−6%</div>
+          <div class="unit">two-qubit depth</div>
+          <p class="note">the target: −5.9% (O2) / −6.2% (O3)</p>
+        </div>
+        <div class="col" style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1rem">
+          <div class="num good" style="font-size:clamp(2rem,6vw,3rem)">−3.6%</div>
+          <div class="unit">two-qubit gate count</div>
+          <p class="note">the guard — fewer gates, not more</p>
+        </div>
+        <div class="col" style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1rem">
+          <div class="num good" style="font-size:clamp(2rem,6vw,3rem)">−3%</div>
+          <div class="unit">scheduled duration</div>
+          <p class="note">shorter circuits = less idle decoherence</p>
+        </div>
+      </div>
+      <div class="callout" style="border-left-color:var(--accent);margin-top:1.1rem">
+        <strong>This settles the "did it cheat?" question independently:</strong> on an outside benchmark, depth <em>and</em> gate count both fall and runtime doesn't regress — genuine routing, not swap-padding. <strong>Honest edge:</strong> end-device fidelity (ESP) improves only modestly (~+0.8% on gate errors) and is roughly flat on idle-decoherence — the circuits are cheaper to run, but the success-probability gain on a modeled chip is small, not another 6%.
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" id="heldout">
+    <div class="inner">
+      <p class="eyebrow">The payoff — generalization</p>
+      <h2 class="big" style="font-size:clamp(1.6rem,4.5vw,2.6rem)">A higher score <em>and</em> a more honest one</h2>
+      <div class="cmp">
+        <div class="col">
+          <h3>Iteration 3 <span class="unit">1.250</span></h3>
+          <div class="num bad">8</div><div class="unit">held-out circuits regressed</div>
+          <div class="dots" aria-hidden="true"><span class="dot bad"></span><span class="dot bad"></span><span class="dot bad"></span><span class="dot bad"></span><span class="dot bad"></span><span class="dot bad"></span><span class="dot bad"></span><span class="dot bad"></span></div>
+          <p class="note">Worst case +10%.</p>
+        </div>
+        <div class="col">
+          <h3>Best candidate <span class="unit">1.297</span></h3>
+          <div class="num good">2</div><div class="unit">held-out circuits regressed</div>
+          <div class="dots" aria-hidden="true"><span class="dot bad"></span><span class="dot bad"></span><span class="dot ok"></span><span class="dot ok"></span><span class="dot ok"></span><span class="dot ok"></span><span class="dot ok"></span><span class="dot ok"></span></div>
+          <p class="note">Worst case +2.9%. The rest are gone.</p>
+        </div>
+      </div>
+      <p class="sub" style="max-width:58ch;margin-top:1.2rem">Given one note that it was over-fitting, the method built a different kind of team and produced a solution that scores higher <em>and</em> generalizes better. That's the result that matters.</p>
+    </div>
+  </section>
+
+  <section class="slide islide" id="i78">
+    <div class="inner">
+      <div class="ihead"><span class="ix">ITER 7–8</span><span class="score muted">lock</span></div>
+      <h2>Stop, verify, and lock it in</h2>
+      <div class="team"><span class="agent new gate">steward</span><span class="agent new gate">finisher</span></div>
+      <div class="rows">
+        <div class="row"><div class="lbl">Why this team</div><p>Back to a single agent — twice. The supervisor judged the gains had peaked for this budget and that the real risk was now <strong>shipping something unverified</strong>.</p></div>
+        <div class="row"><div class="lbl">What they did</div><p>No new optimization. One steward ran the full official harness on the best tree; one finisher made sure exactly that verified tree is what ships — with a fallback plan if the top candidate didn't fully pass.</p></div>
+        <div class="row"><div class="lbl">Result</div><p>The 1.297 solution confirmed and locked — the endpoint of the first run, and the base the continuation (iteration 9) then built on.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" id="arc">
+    <div class="inner">
+      <p class="eyebrow">What the arc shows</p>
+      <h2 class="big" style="font-size:clamp(1.6rem,4.5vw,2.8rem)">The team was never fixed</h2>
+      <div class="arcline">
+        <span class="n">1 agent</span><span class="ar">→</span><span class="n">3</span><span class="ar">→</span>
+        <span class="n">audit team</span><span class="ar">→</span><span class="n">fixers</span><span class="ar">→</span><span class="n">lock</span><span class="ar">→</span><span class="n">resume (1.323)</span><span class="ar">→</span><span class="n">stage-split (1.329)</span>
+      </div>
+      <div class="rows">
+        <div class="row"><p>The supervisor's intent moved with the problem: <strong>find anything → question the heuristic → stop over-fitting → verify and lock → resume and push</strong>. The shape of the team was itself a decision, remade every round.</p></div>
+        <div class="row"><p>The clearest result isn't any single score — it's that <strong>feedback changed behavior</strong>. Told it was over-fitting, it restructured its own team and produced solutions both higher-scoring and more robust on circuits it had never seen. The score rose every iteration: <strong>1.066 → 1.125 → 1.250 → 1.297 → 1.323 → 1.329</strong>.</p></div>
+      </div>
+      <div class="callout" style="margin-top:0.4rem">Honest footnotes: development-panel scores, one task and metric; the best solution still makes 2 of ~400 held-out circuits slightly worse. Iterations 1–3 ran with clean official scores; iterations 4–8 hit a cluster-evaluation bug (now fixed), so the 1.297 was re-scored by an independent evaluator; iterations 9 (1.323) and 10 (1.329) are the continuation's clean official scores, confirming the fix end-to-end.</div>
+    </div>
+  </section>
+
+</div>
+
+<div class="hint" id="hint">use ← → or swipe</div>
+<nav class="bar" aria-label="slides">
+  <button class="nav" id="prev" aria-label="previous slide">‹</button>
+  <div class="dotsnav" id="pips"></div>
+  <button class="nav" id="next" aria-label="next slide">›</button>
+  <span class="counter" id="counter"></span>
+</nav>
+
+<script>
+(function(){
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var pipsWrap = document.getElementById('pips');
+  var counter = document.getElementById('counter');
+  var progbar = document.getElementById('progbar');
+  var hint = document.getElementById('hint');
+  var i = 0;
+
+  slides.forEach(function(s, k){
+    var b = document.createElement('button');
+    b.className = 'pip'; b.setAttribute('aria-label', 'slide ' + (k+1));
+    b.addEventListener('click', function(){ show(k); });
+    pipsWrap.appendChild(b);
+  });
+  var pips = Array.prototype.slice.call(pipsWrap.children);
+
+  function pad(n){ n = String(n); return n.length < 2 ? '0' + n : n; }
+
+  function render(){
+    slides.forEach(function(s, k){ s.classList.toggle('current', k === i); });
+    pips.forEach(function(p, k){ p.classList.toggle('on', k === i); });
+    counter.textContent = pad(i+1) + ' / ' + pad(slides.length);
+    progbar.style.width = (slides.length > 1 ? (i / (slides.length - 1) * 100) : 0) + '%';
+    if (hint) hint.style.display = i === 0 ? '' : 'none';
+    if (slides[i]) slides[i].scrollTop = 0;
+  }
+  function show(n){
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    render();
+    try { history.replaceState(null, '', '#' + slides[i].id); } catch(e){}
+  }
+  function go(d){ show(i + d); }
+
+  document.getElementById('next').addEventListener('click', function(e){ e.stopPropagation(); go(1); });
+  document.getElementById('prev').addEventListener('click', function(e){ e.stopPropagation(); go(-1); });
+
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' '){ go(1); e.preventDefault(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp'){ go(-1); e.preventDefault(); }
+    else if (e.key === 'Home'){ show(0); }
+    else if (e.key === 'End'){ show(slides.length - 1); }
+  });
+
+  document.getElementById('deck').addEventListener('click', function(e){
+    if (e.target.closest('button, a')) return;
+    go(e.clientX < window.innerWidth * 0.35 ? -1 : 1);
+  });
+
+  var sx = null, sy = null;
+  document.addEventListener('touchstart', function(e){ sx = e.changedTouches[0].clientX; sy = e.changedTouches[0].clientY; }, {passive:true});
+  document.addEventListener('touchend', function(e){
+    if (sx === null) return;
+    var dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy;
+    if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) go(dx < 0 ? 1 : -1);
+    sx = sy = null;
+  }, {passive:true});
+
+  function fromHash(){
+    var h = (location.hash || '').slice(1), idx = -1;
+    for (var k = 0; k < slides.length; k++){ if (slides[k].id === h){ idx = k; break; } }
+    i = idx >= 0 ? idx : 0; render();
+  }
+  window.addEventListener('hashchange', fromHash);
+  fromHash();
+})();
+</script>
+</body>
+</html>
