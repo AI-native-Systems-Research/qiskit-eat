@@ -75,12 +75,17 @@ pub struct SabreNode {
     /// node as a whole is routable.
     pub indices: Vec<NodeIndex>,
     pub kind: InteractionKind,
+    /// The number of two-qubit operations in `indices` (at least one for a `TwoQ` node).  This is
+    /// the contribution of the node to the two-qubit depth of the routed circuit.
+    pub num_2q: u32,
 }
 impl SabreNode {
     fn new(initial: NodeIndex, kind: InteractionKind) -> Self {
+        let num_2q = matches!(kind, InteractionKind::TwoQ(_)) as u32;
         Self {
             indices: vec![initial],
             kind,
+            num_2q,
         }
     }
 }
@@ -197,9 +202,12 @@ impl SabreDAG {
                         // A "synchronise" that only has one predecessor isn't actually imposing any
                         // synchronisation.  If a 2q gate depends only on another 2q gate, they've
                         // got to be the same qubits, and therefore it's automatically routable.
-                        (_, InteractionKind::Synchronize)
-                        | (InteractionKind::TwoQ(_), InteractionKind::TwoQ(_)) => {
+                        (_, InteractionKind::Synchronize) => {
                             prev.indices.push(dag_node);
+                        }
+                        (InteractionKind::TwoQ(_), InteractionKind::TwoQ(_)) => {
+                            prev.indices.push(dag_node);
+                            prev.num_2q += 1;
                         }
                         // Otherwise we need the router to evaluate it.
                         (_, kind) => {
@@ -241,6 +249,7 @@ impl SabreDAG {
             dag.add_node(SabreNode {
                 indices: vec![],
                 kind,
+                num_2q: node.num_2q,
             });
         }
         for edge in self.dag.edge_references() {

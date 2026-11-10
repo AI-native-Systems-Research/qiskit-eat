@@ -200,7 +200,8 @@ pub fn sabre_layout_and_routing(
                     ),
                 )
             })
-            .min_by_key(|(index, result)| (result.swap_count(), *index))
+            .map(|(index, result)| ((result.selection_key(), index), result))
+            .min_by_key(|(key, _)| *key)
             .expect("should have at least one layout trial");
             let num_swaps = result.swap_count();
             let out = dag.physical_empty_like_with_capacity(
@@ -306,7 +307,8 @@ pub fn sabre_layout_and_routing(
                         ),
                     )
                 })
-                .min_by_key(|(index, result)| (result.swap_count(), *index))
+                .map(|(index, result)| ((result.selection_key(), index), result))
+                .min_by_key(|(key, _)| *key)
                 .expect("should have at least one layout trial");
                 for ((_, sub_phys), virt) in result
                     .initial_layout

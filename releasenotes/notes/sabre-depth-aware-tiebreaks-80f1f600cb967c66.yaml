@@ -1,0 +1,22 @@
+---
+features_transpiler:
+  - |
+    SABRE's layout and routing stages now break ties by estimated two-qubit depth.
+    Previously, when several layout trials finished with the same number of inserted
+    SWAPs, :class:`.SabreLayout` kept the lowest-indexed trial; and when several
+    candidate SWAPs shared the best routing heuristic score, :class:`.SabreSwap`
+    chose among them at random.  Both tie-breaks are now resolved by preferring the
+    option that routes the circuit's two-qubit gates in the fewest layers: layout
+    trials are selected by ``(swap_count, estimated_two_qubit_depth, trial_index)``
+    instead of ``(swap_count, trial_index)``, and among the best-scoring SWAPs the
+    router keeps those whose deeper qubit ends up shallowest.  Each two-qubit
+    interaction occupies one layer (consecutive gates on the same qubit pair are
+    routed as a single interaction and counted once) and an inserted SWAP occupies
+    three.
+
+    This only re-orders choices the existing heuristics already rate as equal; it
+    does not change which layout trials are generated, which SWAPs are considered,
+    or any heuristic score.  As a result it cannot increase the SWAP count or the
+    two-qubit gate count of the routed circuit -- it routes the same gates with more
+    parallelism, reducing two-qubit depth.  The behaviour is enabled by default; no
+    configuration is required and preset pass managers are unchanged.

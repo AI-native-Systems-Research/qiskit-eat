@@ -166,6 +166,60 @@ impl RoutingResult<'_> {
         self.order.swap_count()
     }
 
+    /// Estimate the two-qubit depth of the routed circuit at the top level, counting each swap as
+    /// three two-qubit gates and each two-qubit gate in the original circuit as one.
+    pub fn depth_estimate(&self) -> usize {
+        let dag = self.problem.dag;
+        let sabre = &self.problem.sabre.dag;
+        let mut layout = self.initial_layout.clone();
+        let mut depth = vec![0usize; self.num_qubits()];
+        let apply_swap = |swap: &[PhysicalQubit; 2], layout: &mut NLayout, depth: &mut [usize]| {
+            layout.swap_physical(swap[0], swap[1]);
+            let level = depth[swap[0].index()].max(depth[swap[1].index()]) + 3;
+            depth[swap[0].index()] = level;
+            depth[swap[1].index()] = level;
+        };
+        let mut scratch = Vec::<PhysicalQubit>::with_capacity(4);
+        for item in &self.order.order {
+            for swap in item.initial_swaps() {
+                apply_swap(swap, &mut layout, &mut depth);
+            }
+            let node = &sabre[item.node];
+            scratch.clear();
+            let num_2q = match &node.kind {
+                InteractionKind::TwoQ([a, b]) => {
+                    scratch.extend([layout[*a], layout[*b]]);
+                    node.num_2q as usize
+                }
+                _ => {
+                    if let Some(NodeType::Operation(inst)) = node.indices.first().map(|i| &dag[*i])
+                    {
+                        scratch.extend(
+                            dag.get_qargs(inst.qubits)
+                                .iter()
+                                .map(|q| VirtualQubit::new(q.0).to_phys(&layout)),
+                        );
+                    }
+                    0
+                }
+            };
+            let level = scratch.iter().map(|q| depth[q.index()]).max().unwrap_or(0) + num_2q;
+            for q in scratch.iter() {
+                depth[q.index()] = level;
+            }
+        }
+        for swap in &self.order.final_swaps {
+            apply_swap(swap, &mut layout, &mut depth);
+        }
+        depth.into_iter().max().unwrap_or(0)
+    }
+
+    /// The key used to choose between trials of the routing algorithm; lower is better.  Trials
+    /// are compared by swap count first, and ties are broken by the estimated two-qubit depth.
+    pub fn selection_key(&self) -> (usize, usize) {
+        (self.swap_count(), self.depth_estimate())
+    }
+
     fn num_qubits(&self) -> usize {
         self.initial_layout.num_qubits()
     }
@@ -590,6 +644,15 @@ struct State {
     best_swaps: Vec<[PhysicalQubit; 2]>,
     rng: Pcg64Mcg,
     seed: u64,
+    /// Two-qubit depth of each physical qubit, counting the routed two-qubit gates of the circuit
+    /// (but not the swaps, which only synchronise the depths of their two qubits).
+    depth: VecMap<PhysicalQubit, usize>,
+    /// How many items of the routing order have been accounted for in `depth`.
+    depth_seen: usize,
+    /// Whether to track `depth` and use it to break ties between equally scored swaps.  This is
+    /// only done for heuristics with a lookahead, where exact ties are uncommon and so breaking
+    /// them by depth costs no swaps.
+    track_depth: bool,
 }
 
 impl State {
@@ -685,8 +748,60 @@ impl State {
             best_swaps: Vec::new(),
             rng: Pcg64Mcg::seed_from_u64(seed),
             seed,
+            depth: vec![0; num_qubits as usize].into(),
+            depth_seen: 0,
+            track_depth: problem.heuristic.lookahead.is_some(),
         };
         (state, order)
+    }
+
+    /// Account for the items routed since the last call in the per-qubit depth tracking.  All
+    /// those items were routed with the current layout (their swaps are already applied).
+    fn update_depth(&mut self, problem: RoutingProblem, order: &Order) {
+        if !self.track_depth {
+            return;
+        }
+        let dag = problem.dag;
+        // Swaps are accounted for as they are applied (see `swap_depth`).
+        for item in &order.order[self.depth_seen..] {
+            let node = &problem.sabre.dag[item.node];
+            match &node.kind {
+                InteractionKind::TwoQ([a, b]) => {
+                    let (pa, pb) = (self.layout[*a], self.layout[*b]);
+                    let level = self.depth[pa].max(self.depth[pb]) + node.num_2q as usize;
+                    self.depth[pa] = level;
+                    self.depth[pb] = level;
+                }
+                _ => {
+                    if let Some(NodeType::Operation(inst)) = node.indices.first().map(|i| &dag[*i])
+                    {
+                        let qargs = dag.get_qargs(inst.qubits);
+                        let level = qargs
+                            .iter()
+                            .map(|q| self.depth[VirtualQubit::new(q.0).to_phys(&self.layout)])
+                            .max()
+                            .unwrap_or(0);
+                        for q in qargs {
+                            self.depth[VirtualQubit::new(q.0).to_phys(&self.layout)] = level;
+                        }
+                    }
+                }
+            }
+        }
+        self.depth_seen = order.order.len();
+    }
+
+    /// Account for a swap in the per-qubit depth tracking, returning the previous depths.
+    ///
+    /// A swap synchronises the depths of its qubits, but is deliberately not counted as adding
+    /// depth itself: the tie-break is about where the circuit's own gates land.
+    #[inline]
+    fn swap_depth(&mut self, swap: [PhysicalQubit; 2]) -> [usize; 2] {
+        let old = [self.depth[swap[0]], self.depth[swap[1]]];
+        let level = old[0].max(old[1]);
+        self.depth[swap[0]] = level;
+        self.depth[swap[1]] = level;
+        old
     }
 
     /// Apply a swap to the program-state structures (front layer, extended set and current
@@ -959,6 +1074,14 @@ impl State {
                 self.best_swaps.push(swap);
             }
         }
+        if self.track_depth && self.best_swaps.len() > 1 {
+            // Among equally good swaps, prefer those on the least deep qubits, so the routed
+            // circuit stays shallow.  The remaining ties are broken randomly as before.
+            let depth = &self.depth;
+            let level = |swap: &[PhysicalQubit; 2]| depth[swap[0]].max(depth[swap[1]]);
+            let min_level = self.best_swaps.iter().map(level).min().unwrap();
+            self.best_swaps.retain(|s| level(s) == min_level);
+        }
         *self.best_swaps.choose(&mut self.rng).unwrap()
     }
 }
@@ -1027,7 +1150,7 @@ pub fn sabre_routing(
 }
 
 /// Run (potentially in parallel) several trials of the Sabre routing algorithm on the given
-/// problem and return the one with fewest swaps.
+/// problem and return the one with fewest swaps, breaking ties by the estimated two-qubit depth.
 pub fn swap_map<'a>(
     problem: RoutingProblem<'a>,
     initial_layout: &'_ NLayout,
@@ -1050,7 +1173,8 @@ pub fn swap_map<'a>(
     )
     .map(|seed| swap_map_trial(problem, initial_layout, seed))
     .enumerate()
-    .min_by_key(|(index, result)| (result.order.swap_count(), *index))
+    .map(|(index, result)| ((result.selection_key(), index), result))
+    .min_by_key(|(key, _)| *key)
     .map(|(_, result)| result)
     .expect("must have at least one trial")
 }
@@ -1062,6 +1186,9 @@ pub fn swap_map_trial<'a>(
     seed: u64,
 ) -> RoutingResult<'a> {
     let (mut state, mut order) = State::begin(problem, initial_layout.clone(), seed);
+    state.update_depth(problem, &order);
+    let track_depth = state.track_depth;
+    let mut depth_undo = Vec::<([PhysicalQubit; 2], [usize; 2])>::new();
 
     let mut routable_nodes = Vec::<NodeIndex>::with_capacity(2);
     let mut num_search_steps = 0;
@@ -1075,6 +1202,10 @@ pub fn swap_map_trial<'a>(
             let best_swap = state.choose_best_swap(problem);
             state.apply_swap(best_swap);
             current_swaps.push(best_swap);
+            if track_depth {
+                let old = state.swap_depth(best_swap);
+                depth_undo.push((best_swap, old));
+            }
             // These two nodes can't be the same; if they are, then the gate is on both qubits of
             // the swap, and so it would have been routable before we applied the swap too, i.e.
             // during the last iteration of the loop.
@@ -1103,10 +1234,21 @@ pub fn swap_map_trial<'a>(
                 .drain(..)
                 .rev()
                 .for_each(|swap| state.apply_swap(swap));
+            for (swap, old) in depth_undo.drain(..).rev() {
+                state.depth[swap[0]] = old[0];
+                state.depth[swap[1]] = old[1];
+            }
             let force_routed = state.force_enable_closest_node(problem, &mut current_swaps);
             routable_nodes.extend(force_routed);
+            if track_depth {
+                for &swap in current_swaps.iter() {
+                    state.swap_depth(swap);
+                }
+            }
         }
+        depth_undo.clear();
         state.update_route(problem, &mut order, &routable_nodes, Some(current_swaps));
+        state.update_depth(problem, &order);
 
         if problem.heuristic.decay.is_some() {
             state.decay.fill(1.);

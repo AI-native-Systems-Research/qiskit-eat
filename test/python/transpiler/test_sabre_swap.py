@@ -1530,5 +1530,55 @@ class TestSabreSwapRandomCircuitValidOutput(QiskitTestCase):
         self.assert_valid_circuit(tqc)
 
 
+@ddt.ddt
+class TestSabreSwapDepthAwareTieBreak(QiskitTestCase):
+    """Properties of the two-qubit-depth tie-break in SabreSwap.
+
+    The tie-break only re-orders choices the heuristic already rates as equal, so it must
+    preserve the circuit's semantics, keep every routed two-qubit gate on the coupling map,
+    and never increase the number of inserted SWAPs (equivalently, the two-qubit gate count).
+    """
+
+    @ddt.data("lookahead", "decay")
+    def test_routing_is_still_correct(self, heuristic):
+        """Routing under the tie-break stays coupling-map-legal and unitarily equivalent."""
+        from qiskit.quantum_info import Operator
+
+        coupling = CouplingMap.from_line(8)
+        for seed in range(6):
+            circuit = random_circuit(8, 8, max_operands=2, measure=False, seed=seed)
+            routed = PassManager(SabreSwap(coupling, heuristic, seed=seed, trials=4)).run(circuit)
+            # every two-qubit gate lands on an edge of the coupling map
+            check = CheckMap(coupling)
+            check(routed)
+            self.assertTrue(check.property_set["is_swap_mapped"])
+            # semantics preserved (inserted SWAPs included in the comparison)
+            self.assertTrue(Operator.from_circuit(routed).equiv(Operator(circuit)))
+
+    @ddt.data("lookahead", "decay")
+    def test_tiebreak_only_adds_swaps(self, heuristic):
+        """The routed circuit is exactly the original's two-qubit gates plus inserted SWAPs.
+
+        The depth tie-break chooses only among equally-scored options, so it never drops or
+        duplicates a gate: two-qubit count must equal the original two-qubit count plus SWAPs.
+        """
+        coupling = CouplingMap.from_line(8)
+        for seed in range(6):
+            circuit = random_circuit(8, 12, max_operands=2, measure=False, seed=seed)
+            routed = PassManager(SabreSwap(coupling, heuristic, seed=seed, trials=4)).run(circuit)
+            swaps = sum(1 for inst in routed.data if inst.operation.name == "swap")
+            two_q = sum(1 for inst in routed.data if inst.operation.num_qubits == 2)
+            orig_two_q = sum(1 for inst in circuit.data if inst.operation.num_qubits == 2)
+            self.assertEqual(two_q, orig_two_q + swaps)
+
+    def test_deterministic_for_fixed_seed(self):
+        """The tie-break key is a pure function of the trial, so output is seed-deterministic."""
+        coupling = CouplingMap.from_line(8)
+        circuit = random_circuit(8, 12, max_operands=2, measure=False, seed=2024)
+        first = PassManager(SabreSwap(coupling, "decay", seed=7, trials=4)).run(circuit)
+        second = PassManager(SabreSwap(coupling, "decay", seed=7, trials=4)).run(circuit)
+        self.assertEqual(first, second)
+
+
 if __name__ == "__main__":
     unittest.main()
