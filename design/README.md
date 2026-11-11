@@ -8,8 +8,9 @@ The code change itself is on branch `sabre-depth-aware-tiebreaks`; this `design/
 | **Presentation** (explains the change) | [`sabre-depth-aware-tiebreaks.pdf`](sabre-depth-aware-tiebreaks.pdf) — 7-slide mechanism walkthrough with a worked example (source: [`change-deck.html`](change-deck.html)) |
 | **PR body** | [`PR_BODY.md`](PR_BODY.md) |
 | **Issue draft** | [`ISSUE.md`](ISSUE.md) |
-| **Validation report** | [`validation-report.md`](validation-report.md) |
-| **Validation script** | [`validate.sh`](validate.sh) — reproduces the eval on the CCC evaluator |
+| **Validation report** (benchmark) | [`validation-report.md`](validation-report.md) |
+| **Validation report** (unitary equivalence) | [`unitary-validation-report.md`](unitary-validation-report.md) — 48/48 small circuits match the original unitary, layout-aware and phase-exact |
+| **Validation scripts** | [`validate.sh`](validate.sh) (benchmark eval) · [`run_validation.py`](run_validation.py) (standalone unitary-equivalence check) |
 | Benchmark deck (results) | [`pr1-benchmark-deck.html`](pr1-benchmark-deck.html) — the numbers, separate from the mechanism presentation |
 
 ## One-line result
