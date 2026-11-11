@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Depth-aware tie-breaks in SABRE</title>
+<style>
+  /* Print-to-PDF slide deck: one .slide = one 16:9 page (1280x720 px = 13.33in x 7.5in). */
+  @page { size: 1280px 720px; margin: 0; }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  html, body { margin: 0; padding: 0; background: #fff; }
+  body { font-family: "Segoe UI", Arial, sans-serif; color: #15233a; }
+  .slide {
+    position: relative; width: 1280px; height: 720px; padding: 56px 72px;
+    break-after: page; page-break-after: always; overflow: hidden; background: #fff;
+  }
+  .slide:last-child { break-after: auto; page-break-after: auto; }
+  .eyebrow { color: #1a6dd6; font-size: 15px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; margin: 0 0 14px; }
+  h1 { font-size: 40px; font-weight: 800; margin: 0 0 20px; color: #15233a; }
+  h2 { font-size: 34px; font-weight: 800; margin: 0 0 8px; color: #15233a; }
+  .big { font-size: 30px; font-weight: 800; color: #15233a; margin: 18px 0 8px; line-height: 1.15; }
+  .sub { font-size: 20px; color: #5a6b80; margin: 0 0 6px; }
+  .eq { font-size: 30px; color: #1a6dd6; font-weight: 700; margin: 22px 0 6px; font-family: "Cambria Math", Georgia, serif; }
+  .eqs { font-size: 24px; color: #1a6dd6; font-weight: 600; margin: 10px 0; font-family: "Cambria Math", Georgia, serif; }
+  .note { font-size: 17px; color: #8795a6; margin: 4px 0; }
+  p.body { font-size: 20px; color: #30415a; line-height: 1.45; margin: 10px 0; max-width: 1050px; }
+  .foot { position: absolute; left: 72px; right: 72px; bottom: 26px; display: flex; justify-content: space-between;
+          font-size: 13px; color: #9aa7b6; border-top: 1px solid #e6eaf0; padding-top: 10px; }
+  .steps { display: flex; gap: 22px; margin: 28px 0 10px; }
+  .step { flex: 1; }
+  .step .n { width: 34px; height: 34px; border-radius: 50%; background: #1a6dd6; color: #fff; font-weight: 800;
+             display: flex; align-items: center; justify-content: center; margin-bottom: 10px; font-size: 17px; }
+  .step h3 { font-size: 19px; margin: 0 0 6px; color: #15233a; }
+  .step p { font-size: 15.5px; color: #5a6b80; margin: 0; line-height: 1.4; }
+  .arrow { align-self: center; color: #c3ccd8; font-size: 22px; }
+  ul.pts { font-size: 20px; color: #30415a; line-height: 1.5; margin: 14px 0; max-width: 1060px; }
+  ul.pts li { margin: 12px 0; }
+  ul.pts b { color: #15233a; }
+  code { font-family: "Consolas", monospace; background: #eef2f7; padding: 1px 6px; border-radius: 4px; font-size: .92em; color: #15233a; }
+  table { border-collapse: collapse; margin: 18px 0; font-size: 18px; }
+  th, td { border: 1px solid #d9e0ea; padding: 7px 16px; text-align: center; }
+  th { background: #15233a; color: #fff; font-weight: 600; }
+  tr.busy td { background: #eaf5f1; }
+  .pick { color: #15806b; font-weight: 800; }
+  .nopick { color: #b4541a; font-weight: 800; }
+  .callout { background: #f1f5fa; border-left: 5px solid #1a6dd6; padding: 14px 18px; font-size: 19px; color: #15233a; margin: 18px 0; max-width: 1050px; }
+  .callout b { color: #15806b; }
+  .two { display: flex; gap: 40px; }
+  .two > div { flex: 1; }
+  .tag { font-weight: 800; font-size: 20px; }
+  .tagA { color: #b4541a; } .tagB { color: #15806b; }
+  text { font-family: "Segoe UI", Arial, sans-serif; }
+</style>
+</head>
+<body>
+
+<!-- 1 -->
+<section class="slide">
+  <p class="eyebrow">Proposed change</p>
+  <h1>Break SABRE ties by two-qubit depth</h1>
+  <p class="big">Among options SABRE already scores as equal, prefer the one that adds the least two-qubit depth.</p>
+  <p class="sub">A tie-break only. It never changes which trials or SWAPs are considered, or any heuristic score &mdash;
+  so the number of SWAPs, and the two-qubit gate count, stay the same. Only depth drops.</p>
+  <p class="eq">layout-trial key:&nbsp; (swaps,&nbsp;index)&nbsp; &rarr;&nbsp; (swaps,&nbsp;est.&nbsp;2q&nbsp;depth,&nbsp;index)</p>
+  <p class="note">On by default. 3 source files, +159 / &minus;6. crates/transpiler/src/passes/sabre/{dag,layout,route}.rs</p>
+  <div class="foot"><span>Qiskit PR &middot; sabre-depth-aware-tiebreaks</span><span>1 / 7</span></div>
+</section>
+
+<!-- 2 -->
+<section class="slide">
+  <p class="eyebrow">Background</p>
+  <h2>SABRE routing in one loop</h2>
+  <p class="sub">&pi;: logical&rarr;physical layout &nbsp;&middot;&nbsp; a two-qubit gate is routable when its operands sit on adjacent physical qubits.</p>
+  <div class="steps">
+    <div class="step"><div class="n">1</div><h3>Front layer</h3><p>Gates whose dependencies are met. Route the ones already adjacent.</p></div>
+    <div class="arrow">&rarr;</div>
+    <div class="step"><div class="n">2</div><h3>Candidate SWAPs</h3><p>Hardware edges touching a qubit in a blocked front-layer gate.</p></div>
+    <div class="arrow">&rarr;</div>
+    <div class="step"><div class="n">3</div><h3>Score each SWAP</h3><p>Distance to the targets, lookahead, optional decay.</p></div>
+    <div class="arrow">&rarr;</div>
+    <div class="step"><div class="n">4</div><h3>Apply &amp; repeat</h3><p>Insert the best SWAP, update &pi;, route newly adjacent gates.</p></div>
+  </div>
+  <p class="body"><b>Layout search</b> runs this in forward/reverse passes over several trials to pick an initial layout;
+  routing keeps the trial with the fewest SWAPs. Two places in this loop routinely produce <b>exact ties</b> &mdash; next slide.</p>
+  <div class="foot"><span>Qiskit PR &middot; sabre-depth-aware-tiebreaks</span><span>2 / 7</span></div>
+</section>
+
+<!-- 3 -->
+<section class="slide">
+  <p class="eyebrow">The gap</p>
+  <h2>Today, ties break arbitrarily</h2>
+  <p class="sub">SABRE's scoring often rates several options exactly equal. It then picks with no regard to the depth of the result.</p>
+  <ul class="pts">
+    <li><b>Layout-trial selection.</b> Several trials finish with the <b>same swap count</b>. SABRE keeps the one with the
+    lowest trial index &mdash; <code>min(swap_count, index)</code>. Index has nothing to do with circuit quality.</li>
+    <li><b>SWAP selection.</b> During routing, several candidate SWAPs share the <b>best heuristic score</b>. SABRE picks
+    one of them <b>uniformly at random</b>.</li>
+  </ul>
+  <div class="callout">Both tie-breaks ignore the two-qubit depth the choice produces. Among options that are otherwise
+  equal, one often routes the circuit's gates in fewer layers &mdash; that depth is left on the table by a coin flip.</div>
+  <div class="foot"><span>Qiskit PR &middot; sabre-depth-aware-tiebreaks</span><span>3 / 7</span></div>
+</section>
+
+<!-- 4 -->
+<section class="slide">
+  <p class="eyebrow">The change</p>
+  <h2>Resolve the tie by two-qubit depth</h2>
+  <p class="sub">Track, per physical qubit, the running two-qubit depth reached so far.</p>
+  <p class="eqs">a routed 2q node on (a, b): &nbsp; depth[a] = depth[b] = max(depth[a], depth[b]) + (its 2q-gate count)</p>
+  <ul class="pts">
+    <li><b>SWAP tie-break</b> (<code>route.rs</code>): among the SWAPs tied for the best heuristic score, keep those whose
+    <b>deeper qubit ends up shallowest</b>, then fall back to the existing random choice. The tracking is rolled back with
+    SABRE's release valve. (<code>dag.rs</code> stores each node's 2q-gate count, <code>num_2q</code>.)</li>
+    <li><b>Layout-trial key</b> (<code>layout.rs</code>): <code>(swap_count, estimated 2q depth, index)</code>. The estimate
+    replays the routed order once, counting a SWAP as three two-qubit gates.</li>
+  </ul>
+  <div class="callout">It only re-orders options already judged equal on swap cost, so the number of SWAPs &mdash; and
+  therefore the <b>two-qubit gate count &mdash; cannot change</b>. The routed gates are the same; they are packed into fewer layers.</div>
+  <div class="foot"><span>Qiskit PR &middot; sabre-depth-aware-tiebreaks</span><span>4 / 7</span></div>
+</section>
+
+<!-- 5 -->
+<section class="slide">
+  <p class="eyebrow">Worked example &middot; 1 of 3 &middot; the setup</p>
+  <h2>One busy chain, two idle wires</h2>
+  <p class="sub">5-qubit line. A prefix of gates keeps P0&ndash;P2 busy; P3 and P4 sit idle. Then a gate G = CX(q2, q4) must route.</p>
+  <svg width="1120" height="330" viewBox="0 0 1120 330" role="img" aria-label="hardware line and circuit prefix">
+    <!-- hardware line -->
+    <g font-size="17" fill="#15233a">
+      <line x1="120" y1="40" x2="840" y2="40" stroke="#c3ccd8" stroke-width="3"/>
+      <line x1="480" y1="40" x2="840" y2="40" stroke="#b4541a" stroke-width="5"/>
+      <g text-anchor="middle">
+        <circle cx="120" cy="40" r="22" fill="#fff" stroke="#15233a" stroke-width="2"/><text x="120" y="46">P0</text>
+        <circle cx="300" cy="40" r="22" fill="#fff" stroke="#15233a" stroke-width="2"/><text x="300" y="46">P1</text>
+        <circle cx="480" cy="40" r="22" fill="#fff" stroke="#15233a" stroke-width="2"/><text x="480" y="46">P2</text>
+        <circle cx="660" cy="40" r="22" fill="#fff" stroke="#15233a" stroke-width="2"/><text x="660" y="46">P3</text>
+        <circle cx="840" cy="40" r="22" fill="#fff" stroke="#15233a" stroke-width="2"/><text x="840" y="46">P4</text>
+      </g>
+      <g fill="#8795a6" font-size="14" text-anchor="middle">
+        <text x="120" y="78">q0</text><text x="300" y="78">q1</text><text x="480" y="78">q2</text><text x="660" y="78">q3</text><text x="840" y="78">q4</text>
+      </g>
+    </g>
+    <!-- circuit: 5 wires, 4 prefix CX on q0-q1-q2 chain, then G=CX(q2,q4) -->
+    <g font-size="15" fill="#15233a">
+      <g stroke="#d0d7e0" stroke-width="2">
+        <line x1="150" y1="140" x2="1060" y2="140"/><line x1="150" y1="180" x2="1060" y2="180"/>
+        <line x1="150" y1="220" x2="1060" y2="220"/><line x1="150" y1="260" x2="1060" y2="260"/>
+        <line x1="150" y1="300" x2="1060" y2="300"/>
+      </g>
+      <g text-anchor="end" fill="#5a6b80"><text x="140" y="145">q0</text><text x="140" y="185">q1</text><text x="140" y="225">q2</text><text x="140" y="265">q3</text><text x="140" y="305">q4</text></g>
+      <!-- prefix CX (blue): g1 q0-q1, g2 q1-q2, g3 q0-q1, g4 q1-q2 -->
+      <g stroke="#1a6dd6" stroke-width="2.5" fill="#1a6dd6">
+        <line x1="230" y1="140" x2="230" y2="180"/><circle cx="230" cy="140" r="5"/><circle cx="230" cy="180" r="12" fill="none" stroke-width="2.5"/><line x1="230" y1="168" x2="230" y2="192" stroke-width="2"/>
+        <line x1="330" y1="180" x2="330" y2="220"/><circle cx="330" cy="180" r="5"/><circle cx="330" cy="220" r="12" fill="none" stroke-width="2.5"/><line x1="330" y1="208" x2="330" y2="232" stroke-width="2"/>
+        <line x1="430" y1="140" x2="430" y2="180"/><circle cx="430" cy="140" r="5"/><circle cx="430" cy="180" r="12" fill="none" stroke-width="2.5"/><line x1="430" y1="168" x2="430" y2="192" stroke-width="2"/>
+        <line x1="530" y1="180" x2="530" y2="220"/><circle cx="530" cy="180" r="5"/><circle cx="530" cy="220" r="12" fill="none" stroke-width="2.5"/><line x1="530" y1="208" x2="530" y2="232" stroke-width="2"/>
+      </g>
+      <!-- G (orange): q2-q4 -->
+      <g stroke="#b4541a" stroke-width="2.5" fill="#b4541a">
+        <line x1="760" y1="220" x2="760" y2="300"/><circle cx="760" cy="220" r="5"/><circle cx="760" cy="300" r="12" fill="none" stroke-width="2.5"/><line x1="760" y1="288" x2="760" y2="312" stroke-width="2"/>
+      </g>
+      <g font-size="15" font-weight="700"><text x="230" y="118" fill="#1a6dd6" text-anchor="middle">g1</text><text x="330" y="118" fill="#1a6dd6" text-anchor="middle">g2</text><text x="430" y="118" fill="#1a6dd6" text-anchor="middle">g3</text><text x="530" y="118" fill="#1a6dd6" text-anchor="middle">g4</text><text x="760" y="118" fill="#b4541a" text-anchor="middle">G</text></g>
+    </g>
+  </svg>
+  <p class="body">G's qubits q2 and q4 are 2 edges apart, so one SWAP is needed. The blue prefix shares q1, so those gates
+  stack up on P0&ndash;P2; P3 and P4 never get used.</p>
+  <div class="foot"><span>Qiskit PR &middot; sabre-depth-aware-tiebreaks</span><span>5 / 7</span></div>
+</section>
+
+<!-- 6 -->
+<section class="slide">
+  <p class="eyebrow">Worked example &middot; 2 of 3 &middot; two tied SWAPs</p>
+  <h2>Both SWAPs fix G &mdash; the heuristic ties</h2>
+  <p class="sub">Per-qubit two-qubit depth after the prefix (each CX adds one layer to both its qubits):</p>
+  <table>
+    <tr><th>physical wire</th><th>P0</th><th>P1</th><th>P2</th><th>P3</th><th>P4</th></tr>
+    <tr class="busy"><td>2q depth so far</td><td>3</td><td>4</td><td>4</td><td>0</td><td>0</td></tr>
+  </table>
+  <div class="two">
+    <div>
+      <p class="tag tagA">A: SWAP(P2, P3)</p>
+      <p class="body">Brings q2 next to q4. Lands on <b>P2</b>, which is already at depth 4.<br>Deeper endpoint depth = <b>4</b>.</p>
+    </div>
+    <div>
+      <p class="tag tagB">B: SWAP(P3, P4)</p>
+      <p class="body">Also brings the pair adjacent. Lands on <b>idle</b> P3&ndash;P4.<br>Deeper endpoint depth = <b>0</b>.</p>
+    </div>
+  </div>
+  <div class="callout">Both SWAPs reduce G's distance from 2 to 1, so SABRE's distance/lookahead score rates them
+  <b style="color:#15233a">exactly equal</b>. Today it would pick between A and B at random.</div>
+  <div class="foot"><span>Qiskit PR &middot; sabre-depth-aware-tiebreaks</span><span>6 / 7</span></div>
+</section>
+
+<!-- 7 -->
+<section class="slide">
+  <p class="eyebrow">Worked example &middot; 3 of 3 &middot; the decision</p>
+  <h2>The tie-break keeps the shallower route</h2>
+  <table>
+    <tr><th>quantity</th><th class="nopick">A: SWAP(P2,P3)</th><th class="pick">B: SWAP(P3,P4)</th></tr>
+    <tr><td>heuristic score (distance)</td><td>&minus;1</td><td>&minus;1 &nbsp;(tie)</td></tr>
+    <tr><td>SWAPs inserted</td><td>1</td><td>1 &nbsp;(same)</td></tr>
+    <tr><td>deeper endpoint&rsquo;s 2q depth</td><td class="nopick">4</td><td class="pick">0</td></tr>
+    <tr class="busy"><td>finish depth of the block</td><td class="nopick">8</td><td class="pick">5</td></tr>
+  </table>
+  <p class="body">Same heuristic score, same one SWAP, same two-qubit gate count. But A stacks the SWAP on the already-deep
+  P2 chain (4 + 3 + 1 = 8 layers), while B runs it on the idle wires and overlaps the busy prefix (max(4,3) + 1 = 5).</p>
+  <div class="callout"><b>Without the tie-break:</b> a 50/50 coin flip between A and B.
+  &nbsp;<b>With it:</b> always B &mdash; the shallower route. Same gates, fewer layers. Applied across every tie in layout
+  search and routing, this is where the two-qubit-depth reduction comes from.</div>
+  <div class="foot"><span>Qiskit PR &middot; sabre-depth-aware-tiebreaks</span><span>7 / 7</span></div>
+</section>
+
+</body>
+</html>

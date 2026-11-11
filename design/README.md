@@ -5,11 +5,12 @@ The code change itself is on branch `sabre-depth-aware-tiebreaks`; this `design/
 
 | Artifact | File |
 |---|---|
-| **Presentation** (benchmark deck) | [`pr1-benchmark-deck.html`](pr1-benchmark-deck.html) — open in a browser |
+| **Presentation** (explains the change) | [`sabre-depth-aware-tiebreaks.pdf`](sabre-depth-aware-tiebreaks.pdf) — 7-slide mechanism walkthrough with a worked example (source: [`change-deck.html`](change-deck.html)) |
 | **PR body** | [`PR_BODY.md`](PR_BODY.md) |
 | **Issue draft** | [`ISSUE.md`](ISSUE.md) |
 | **Validation report** | [`validation-report.md`](validation-report.md) |
 | **Validation script** | [`validate.sh`](validate.sh) — reproduces the eval on the CCC evaluator |
+| Benchmark deck (results) | [`pr1-benchmark-deck.html`](pr1-benchmark-deck.html) — the numbers, separate from the mechanism presentation |
 
 ## One-line result
 
